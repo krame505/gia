@@ -253,9 +253,11 @@ e::Expr ::= h::Expr t::Expr
     end;
   
   e.value =
-    case t.value of
-      val:listValue(vs) -> val:listValue(h.value :: vs)
-    | _ -> val:opError("::", h.value, t.value, e.location)
+    case h.value, t.value of
+      errorValue(_), _ -> h.value
+    | _, errorValue(_) -> t.value
+    | v, val:listValue(vs) -> val:listValue(v :: vs)
+    | _, _ -> val:opError("::", h.value, t.value, e.location)
     end;
 }
 
@@ -278,7 +280,7 @@ e::Expr ::= el::Exprs
 {
   e.errors := el.errors;
   e.patternErrors := el.patternErrors;
-  e.pp = concat([text("("), el.pp, text(")")]);
+  e.pp = concat([text("["), el.pp, text("]")]);
   
   e.value = val:listValue(el.values);
   

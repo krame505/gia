@@ -52,8 +52,8 @@ terminal Colon_t      ':';
 terminal Assign_t     '='  lexer classes {Symbol};
 
 -- Operators
-terminal Cons_t     '::' precedence = 1, association = left, lexer classes {Symbol};
-terminal Match_t    '~'  precedence = 1, association = left, lexer classes {Symbol};
+terminal Match_t    '~'  precedence = 0, association = left, lexer classes {Symbol};
+terminal Cons_t     '::' precedence = 1, association = right, lexer classes {Symbol};
 terminal Or_t       '|'  precedence = 2, association = left, lexer classes {Symbol};
 terminal Xor_t      '^'  precedence = 3, association = left, lexer classes {Symbol};
 terminal And_t      '&'  precedence = 4, association = left, lexer classes {Symbol};
