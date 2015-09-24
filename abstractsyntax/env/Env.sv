@@ -1,7 +1,6 @@
 grammar gia:abstractsyntax:env;
 
 imports gia:abstractsyntax;
-imports gia:abstractsyntax:value;
 
 imports silver:util:raw:treemap as tm;
 

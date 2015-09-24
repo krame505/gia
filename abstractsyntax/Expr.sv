@@ -97,12 +97,17 @@ e::Expr ::= n::Name args::Exprs
   e.errors := n.lookupCheck ++ args.errors; -- TODO: Look up n? Check number of args?
   e.patternErrors := args.patternErrors;
   
-  --e.value = --val:nodeValue(n, args.values, node.body); -- TODO
+  e.value =
+    case n.lookup.value of
+      val:constructorValue(env, params, rules) ->
+        val:nodeValue(n.name, args.values, map(getRuleValue(_, bodyEnv), rules))
+    end;
+  
   e.matchRes = 
     case e.matchValue of
       val:nodeValue(m, _, _) ->
         if n.name == m
-        then val:listValue(args.matchResults)
+        then args.matchRes
         else val:noneValue()
     | _ -> val:noneValue()
     end;
@@ -117,12 +122,6 @@ e::Expr ::= n::Name args::Exprs
     case n.lookup.value of
       val:constructorValue(env, params, rules) ->
         foldr(updateRuleEnv(_, bodyEnv, _), addEnv(decorate params with {args = args.values;}.defs, env), rules)
-    end;
-  
-  e.value =
-    case n.lookup.value of
-      val:constructorValue(env, params, rules) ->
-        val:nodeValue(n.name, args.values, map(getRuleValue(_, bodyEnv), rules))
     end;
 }
 
@@ -265,14 +264,20 @@ e::Expr ::= el::Exprs
   e.patternErrors := el.patternErrors;
   
   e.value = val:listValue(el.values);
+  
+  el.matchValues =
+    case e.matchValue of
+      val:listValue(vs) -> vs
+    | v -> [v]
+    end;
+  e.matchRes = el.matchRes;
 }
 
 synthesized attribute values::[val:Value];
 inherited attribute matchValues::[val:Value];
-synthesized attribute matchResults::[val:Value];
 synthesized attribute len::Integer;
 
-nonterminal Exprs with env, errors, patternErrors, values, matchValues, matchResults, len;
+nonterminal Exprs with env, errors, patternErrors, values, matchValues, matchRes, len;
 
 abstract production consExpr
 e::Exprs ::= h::Expr t::Exprs
@@ -283,7 +288,12 @@ e::Exprs ::= h::Expr t::Exprs
   e.values = h.value :: t.values;
   h.matchValue = head(e.matchValues);
   t.matchValues = tail(e.matchValues);
-  e.matchResults = h.matchRes :: t.matchResults;
+  e.matchRes =
+    case t.matchRes of
+      val:listValue([]) -> val:noneValue()
+    | val:listValue(vs) -> val:listValue(h.matchRes :: vs)
+    | _ -> val:noneValue()
+    end;
   e.len = t.len + 1;
 }
 
@@ -293,6 +303,10 @@ e::Exprs ::=
   e.errors := [];
   e.patternErrors := [];
   e.values = [];
-  e.matchResults = [];
+  e.matchRes =
+    case e.matchValues of
+      [] -> val:listValue([])
+    | _ -> val:noneValue()
+    end;
   e.len = 0;
 }

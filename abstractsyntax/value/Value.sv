@@ -3,7 +3,7 @@ grammar gia:abstractsyntax:value;
 imports gia:abstractsyntax;
 imports gia:abstractsyntax:env;
 
-imports silver:langutil;
+imports silver:langutil hiding pp;
 imports silver:langutil:pp with implode as ppImplode;
 
 synthesized attribute add::(Value ::= Value Location);
@@ -121,9 +121,10 @@ function addList
 Value ::= l::[Value] v::Value loc::Location
 {
   return
-    case v of
-      listValue(m) -> listValue(l ++ m)
-    | _ -> opError("+", listValue(l), v, loc)
+    case l, v of
+      _, listValue(m) -> listValue(l ++ m)
+    | w :: [], _ -> w.add(v, loc)
+    | _, _ -> opError("+", listValue(l), v, loc)
     end;
 }
 
