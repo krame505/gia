@@ -33,7 +33,7 @@ d::Decl ::= 'use' s::StringConstant_t ';'
   d.ast = abs:decls(cst.ast, location=d.location);
   d.ioOut = cst.ioOut;
   
-  local file::String = substring(1, length(s.lexeme) - 2, s.lexeme);
+  local file::String = substring(1, length(s.lexeme) - 1, s.lexeme);
   local fileWithPath::String =
     if substring(0, 1, file) == "/"
     then file
@@ -47,20 +47,19 @@ d::Decl ::= 'use' s::StringConstant_t ';'
   local isF::IOVal<Boolean> = isFile(fileWithPath, d.ioIn);
   local text::IOVal<String> = readFile(fileWithPath, text.io);
   local parseResult::ParseResult<Root> = d.parse(text.iovalue, file);
-  local cst::Decorated Decls =
-    decorate 
-      if !isF.iovalue
-      then parseErrorDecls("File " ++ fileWithPath ++ " not found")
-      else if parseResult.parseSuccess
-      then case parseResult.parseTree of root(ds) -> ds end
-      else parseErrorDecls(parseResult.parseErrors)
-    with {ioIn = if !isF.iovalue then isF.io else text.io;
-          currentDir = newDir;
-          parse = d.parse;};
+  local cst::Decls =
+    if !isF.iovalue
+    then parseErrorDecls("File " ++ fileWithPath ++ " not found")
+    else if parseResult.parseSuccess
+    then case parseResult.parseTree of root(ds) -> ds end
+    else parseErrorDecls(parseResult.parseErrors);
+  cst.ioIn = if !isF.iovalue then isF.io else text.io;
+  cst.currentDir = newDir;
+  cst.parse = d.parse;
 }
 
 concrete production nodeDecl
-d::Decl ::= n::Id_t p::Params b::Body
+d::Decl ::= n::Id_t '(' p::Params ')' '{' b::Body '}'
 {
   d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, b.ast, location=d.location);
   d.ioOut = d.ioIn;
@@ -68,7 +67,7 @@ d::Decl ::= n::Id_t p::Params b::Body
 
 {-
 concrete production FunctionDecl
-d::Decl ::= n::Id_t p::Params e::Expr
+d::Decl ::= n::Id_t '(' p::Params ')' '{' e::Expr '}'
 {
   d.ast = ...;
 }
@@ -76,14 +75,16 @@ d::Decl ::= n::Id_t p::Params e::Expr
 
 nonterminal Params with ast<abs:Params>, location;
 
-concrete production consParam
-p::Params ::= h::Id_t t::Params
-{
-  p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), t.ast, location=p.location);
-}
-
-concrete production nilParam
-p::Params ::= 
-{
-  p.ast = abs:nilParam(location=p.location);
-}
+concrete productions p::Params
+| h::Id_t ',' t::Params
+  {
+    p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), t.ast);
+  }
+| h::Id_t
+  {
+    p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), abs:nilParam());
+  }
+|
+  {
+    p.ast = abs:nilParam();
+  }

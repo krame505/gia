@@ -20,6 +20,7 @@ r::Root ::= d::Decls
 {
   r.errors := d.errors;
   d.evalExpr = r.evalExpr;
+  r.evalRes = d.evalRes;
   
   d.env = emptyEnv();
 }

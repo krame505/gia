@@ -3,6 +3,7 @@ grammar gia:concretesyntax;
 imports gia:abstractsyntax as abs;
 
 imports silver:langutil;
+imports silver:langutil:pp;
 
 -- Needed for 'use' statments
 autocopy attribute currentDir::String;

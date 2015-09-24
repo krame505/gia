@@ -5,7 +5,7 @@ synthesized attribute value::val:Value;
 inherited attribute matchValue::val:Value;
 synthesized attribute matchRes::val:Value;
 
-nonterminal Expr with env, errors, patternErrors, value, matchValue, matchRes, location;
+nonterminal Expr with env, errors, patternErrors, pp, value, matchValue, matchRes, location;
 
 aspect default production
 e::Expr ::=
@@ -18,6 +18,7 @@ abstract production noneLiteral
 e::Expr ::= 
 {
   e.errors := [];
+  e.pp = text("none");
   e.value = val:noneValue();
 }
 
@@ -25,6 +26,7 @@ abstract production valueExpr
 e::Expr ::= v::val:Value
 {
   e.errors := [];
+  e.pp = text("<value>");
   e.value = v;
   e.matchRes = error("Matching on valueExpr");
 }
@@ -33,6 +35,7 @@ abstract production intLiteral
 e::Expr ::= i::Integer
 {
   e.errors := [];
+  e.pp = text(toString(i));
   e.value = val:intValue(i);
   e.matchRes =
     case e.matchValue of
@@ -45,6 +48,7 @@ abstract production strLiteral
 e::Expr ::= s::String
 {
   e.errors := [];
+  e.pp = text("\"" ++ s ++ "\"");
   e.value = val:strValue(s);
   e.matchRes =
     case e.matchValue of
@@ -57,6 +61,7 @@ abstract production wildcardLiteral
 e::Expr ::= 
 {
   e.errors := [err(e.location, "Wildcard cannot occur in non-pattern expression")];
+  e.pp = text("_");
   e.value = val:noneValue();
   e.matchRes = val:listValue([]);
 }
@@ -66,6 +71,7 @@ e::Expr ::= n::Name
 {
   e.errors := n.lookupCheck;
   e.patternErrors := [err(e.location, "Name cannot occur in pattern expression")];
+  e.pp = text(n.name);
   e.value = n.lookup.value;
 }
 
@@ -74,6 +80,7 @@ e::Expr ::= e1::Expr
 {
   e.errors := [err(e.location, "Capture cannot occur in non-pattern expression")];
   e.patternErrors := e1.patternErrors;
+  e.pp = cat(text("@"), e1.pp);
   e.value = e1.value;
   e1.matchValue = e.matchValue;
   e.matchRes = val:listValue([e.matchValue]);
@@ -96,6 +103,7 @@ e::Expr ::= n::Name args::Exprs
 {
   e.errors := n.lookupCheck ++ args.errors; -- TODO: Look up n? Check number of args?
   e.patternErrors := args.patternErrors;
+  e.pp = concat([text(n.name), text("("), args.pp, text(")")]);
   
   e.value =
     case n.lookup.value of
@@ -142,6 +150,7 @@ e::Expr ::= f::Expr args::Exprs
 {
   e.errors := f.errors ++ args.errors;
   e.patternErrors := [err(e.location, "Function call cannot occur in pattern expression")];
+  e.pp = concat([f.pp, text("("), args.pp, text(")")]);
   
   e.value =
     case f.value of
@@ -158,6 +167,7 @@ e::Expr ::= params::Params body::Expr
 {
   e.errors := params.errors ++ body.errors; -- TODO: Look up n? Check number of args?
   e.patternErrors := [err(e.location, "Lambda cannot occur in pattern expression")];
+  e.pp = concat([text("fn (<params>)"), text("("), body.pp, text(")")]); -- TODO
   
   -- Provide dummy values for checking the declaration for errors
   params.args = [];
@@ -171,6 +181,7 @@ e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "+ cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("+"), e2.pp]);
   e.value = e1.value.val:add(e2.value, e.location);
 }
 
@@ -179,6 +190,7 @@ e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "& cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("&"), e2.pp]);
   e.value = e1.value.val:and(e2.value, e.location);
 }
 
@@ -187,6 +199,7 @@ e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "| cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("|"), e2.pp]);
   e.value = e1.value.val:or(e2.value, e.location);
 }
 
@@ -195,7 +208,7 @@ e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.patternErrors;
   e.patternErrors := [err(e.location, "~ cannot occur in pattern expression")];
-  
+  e.pp = concat([e1.pp, text("~"), e2.pp]);
   e2.matchValue = e1.value;
   e.value = e2.matchRes;
 }
@@ -205,6 +218,7 @@ e::Expr ::= e1::Expr n::Name
 {
   e.errors := e1.errors;
   e.patternErrors := [err(e.location, ". cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("."), text(n.name)]);
   e.value = e1.value.val:access(n, e.location);
 }
 
@@ -213,6 +227,7 @@ e::Expr ::= h::Expr t::Expr
 {
   e.errors := h.errors ++ t.errors;
   e.patternErrors := h.patternErrors ++ t.patternErrors;
+  e.pp = concat([h.pp, text("::"), t.pp]);
   
   h.matchValue =
     case e.matchValue of
@@ -228,13 +243,13 @@ e::Expr ::= h::Expr t::Expr
   
   e.matchRes =
     case e.matchValue of
-      val:listValue([]) -> val:noneValue()
-    | val:listValue(_) ->
+      val:listValue(_) ->
       case h.matchRes, t.matchRes of
         val:listValue(vs1), val:listValue(vs2) -> val:listValue(vs1 ++ vs2)
       | val:noneValue(), _ -> val:noneValue()
       | _, val:noneValue() -> val:noneValue()
       end
+    | _ -> val:noneValue()
     end;
   
   e.value =
@@ -249,6 +264,7 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
 {
   e.errors := cnd.errors ++ th.errors ++ el.errors;
   e.patternErrors := [err(e.location, "Conditional cannot occur in pattern expression")];
+  e.pp = concat([text("if"), cnd.pp, text("then"), th.pp, text("else"), el.pp]);
   
   e.value =
     case cnd.value of
@@ -262,6 +278,7 @@ e::Expr ::= el::Exprs
 {
   e.errors := el.errors;
   e.patternErrors := el.patternErrors;
+  e.pp = concat([text("("), el.pp, text(")")]);
   
   e.value = val:listValue(el.values);
   
@@ -277,13 +294,14 @@ synthesized attribute values::[val:Value];
 inherited attribute matchValues::[val:Value];
 synthesized attribute len::Integer;
 
-nonterminal Exprs with env, errors, patternErrors, values, matchValues, matchRes, len;
+nonterminal Exprs with env, errors, patternErrors, pp, values, matchValues, matchRes, len;
 
 abstract production consExpr
 e::Exprs ::= h::Expr t::Exprs
 {
   e.errors := h.errors ++ t.errors;
   e.patternErrors := h.patternErrors ++ t.patternErrors;
+  e.pp = concat([h.pp, text(","), t.pp]);
   
   e.values = h.value :: t.values;
   h.matchValue = head(e.matchValues);
@@ -302,6 +320,7 @@ e::Exprs ::=
 {
   e.errors := [];
   e.patternErrors := [];
+  e.pp = text("");
   e.values = [];
   e.matchRes =
     case e.matchValues of

@@ -17,8 +17,9 @@ d::Decls ::=
   d.errors := [];
   d.defs = [];
   
-  local evalExpr::Decorated Expr =
-    decorate d.evalExpr with {env = d.env;};
+  local evalExpr::Expr = d.evalExpr;
+  evalExpr.env = d.env;
+  
   d.evalRes =
     if null(evalExpr.errors)
     then evalExpr.value
@@ -62,7 +63,7 @@ d::Decl ::= n::Name p::Params e::Expr
 -}
 
 inherited attribute args::[val:Value];
-nonterminal Params with env, defs, errors, pp, args, len, location;
+nonterminal Params with env, defs, errors, pp, args, len;
 
 abstract production consParam
 p::Params ::= h::Name t::Params
@@ -72,7 +73,7 @@ p::Params ::= h::Name t::Params
      then [err(h.location, "Duplicate parameter " ++ h.name)]
      else []) ++ t.errors;
   
-  p.pp = concat([h.pp, text(", "), t.pp]);
+  p.pp = if t.len > 0 then concat([h.pp, text(", "), t.pp]) else h.pp;
   
   local callValue::val:Value = if null(p.args) then val:noneValue() else head(p.args);
   t.args = if null(p.args) then [] else tail(p.args);
@@ -84,6 +85,7 @@ abstract production nilParam
 p::Params ::= 
 {
   p.errors := [];
+  p.pp = text("");
   p.defs = [];
   p.len = 0;
 }
