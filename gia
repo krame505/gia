@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# OS-specific checks for presence of greadlink
+case `uname` in
+*Darwin*)
+  READLINK=greadlink
+  GREADLINKLOCATION=`which greadlink`
+  if [ -z ${GREADLINKLOCATION} ]; then
+    # install should have complained already, but maybe configuration changed
+    echo "Missing greadlink. Please 'brew install coreutils'"
+    exit 1
+  fi
+  ;;
+*)
+  READLINK=readlink
+  ;;
+esac
+
+JAR_NAME=$("$READLINK" -f "${BASH_SOURCE}").jar
+
+if [ ! -f "$JAR_NAME" ]; then
+  echo "Couldn't find the gia jars to execute, aborting."
+  echo "Looked for $JAR_NAME"
+  exit 2
+fi
+
+LOAD_LIST=$@
+
+function run_gia {
+    LOAD_SCRIPT=""
+    for FILE in $LOAD_LIST
+    do
+        LOAD_SCTIPT+="use $FILE; "
+    done
+
+    java -jar $JAR_NAME "$LOAD_SCRIPT" "User input" $@
+}
+
+echo -n "(gia) "
+while read LINE
+do
+    if [[ ! -z ${LINE// /} ]]
+    then
+        set $LINE
+        case $1 in
+            "exit")
+                exit 0
+                ;;
+            "use")
+                if [ -f $2 ]
+                then
+                    LOAD_LIST+=$2
+                else
+                    echo "File $2 not found"
+                fi
+                ;;
+            *)
+                run_gia $@
+        esac
+    fi
+    echo -n "(gia) "
+done

@@ -1,0 +1,80 @@
+#!/bin/bash
+
+if [ ! -f gia.jar ]
+then
+    ./build || (echo "Build failed"; exit 1)
+fi
+
+if [ ! -d ~/bin ]
+then
+  echo -e "This script's purpose is to place the 'gia' script in ~/bin.\n"
+  echo "You do no have a ~/bin directory, so this script is aborting."
+  case `uname` in
+  *Darwin*) 
+    echo "There is another script 'osx-create-home-bin' that will create a"
+    echo "~/bin directory and alter your shell's path. Take a look with:"
+    echo -e "\tcat osx-create-home-bin"
+    echo -e "\t./osx-create-home-bin"
+    echo -e "\t./install"
+    ;;
+  *)
+    echo "In most popular linux distributions, you can simply"
+    echo -e "\tmkdir ~/bin"
+    echo "and restart your terminal, and it will work."
+    echo "But in some cases you may also have to alter your shell startup"
+    echo "scripts to include it in your PATH."
+    ;;
+  esac
+  exit 1
+fi
+
+echo "Found ~/bin"
+
+case `uname` in
+*Darwin*)
+  READLINK=greadlink
+  if [ ! -f `which greadlink` ]; then
+    echo "Missing greadlink. Please install coreutils:"
+    echo -e "\tbrew install coreutils"
+    exit 4
+  fi
+  ;;
+*)
+  READLINK=readlink
+  ;;
+esac
+
+
+if [ -f gia ]
+then
+  REPO=$("$READLINK" -f ../..)
+  SCRIPT=gia
+elif [ -f support/bin/gia ]
+then
+  REPO=$("$READLINK" -f .)
+  SCRIPT=support/bin/gia
+else
+  echo "Couldn't find the gia REPL script!"
+  exit 2
+fi
+  
+echo "Found $REPO"
+
+if [ -a ~/bin/gia ]; then
+  rm ~/bin/gia
+  echo "Removed old(?) ~/bin/gia file."
+fi
+
+ln -s "$("$READLINK" -f "$SCRIPT")" ~/bin/
+
+if [ ! $? ]; then
+  echo "Install failed!"
+  exit 3
+fi
+
+echo "Created ~/bin/gia"
+
+# Just in case
+chmod +x "$SCRIPT"
+
+echo "Install finished."
