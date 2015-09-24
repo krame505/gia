@@ -36,8 +36,7 @@ function run_gia {
     java -jar $JAR_NAME "$LOAD_SCRIPT" "User input" $@
 }
 
-echo -n "(gia) "
-while read LINE
+while read -e -p '(gia) ' LINE
 do
     if [[ ! -z ${LINE// /} ]]
     then
@@ -58,5 +57,5 @@ do
                 run_gia $@
         esac
     fi
-    echo -n "(gia) "
+    history -s "$LINE"
 done
