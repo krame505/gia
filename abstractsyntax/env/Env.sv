@@ -4,11 +4,20 @@ imports gia:abstractsyntax;
 
 imports silver:util:raw:treemap as tm;
 
-type Env = tm:Map<String Value>;
-type Def = Pair<String Value>;
+type Env<a> = tm:Map<String a>;
+type Def<a> = Pair<String a>;
 
-autocopy attribute env::Env;
-synthesized attribute defs::[Def];
+type ValueEnv = Env<Value>;
+type ValueDef = Def<Value>;
+
+--type TypeEnv = Env<Type>;
+--type TypeDef = Def<Type>;
+
+autocopy attribute env::ValueEnv;
+synthesized attribute defs::[ValueDef];
+
+--autocopy attribute typeEnv::TypeEnv;
+--synthesized attribute typeDefs::[TypeDef];
 {-
 nonterminal EnvItem with value;
 
@@ -19,19 +28,19 @@ ei::EnvItem ::= v::Value
 }
 -}
 function emptyEnv
-Env ::=
+Env<a> ::=
 {
   return tm:empty(compareString);
 }
 
 function addEnv
-Env ::= d::[Def] e::Env
+Env<a> ::= d::[Def<a>] e::Env<a>
 {
   return tm:add(d, e);
 }
 
 function lookup
-[Value] ::= n::String e::Env
+[a] ::= n::String e::Env<a>
 {
   return tm:lookup(n, e);
 }

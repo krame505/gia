@@ -22,6 +22,14 @@ e::Expr ::=
   e.value = val:noneValue();
 }
 
+abstract production trueLiteral
+e::Expr ::= 
+{
+  e.errors := [];
+  e.pp = text("true");
+  e.value = val:trueValue();
+}
+
 abstract production valueExpr
 e::Expr ::= v::val:Value
 {
@@ -205,18 +213,43 @@ abstract production andOp
 e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.errors;
-  e.patternErrors := [err(e.location, "& cannot occur in pattern expression")];
+  e.patternErrors := e1.patternErrors ++ e2.patternErrors;
   e.pp = concat([e1.pp, text("&"), e2.pp]);
   e.value = e1.value.val:and(e2.value, e.location);
+  e1.matchValue = e.matchValue;
+  e2.matchValue = e.matchValue;
+  e.matchRes = e1.matchRes.val:and(e2.matchRes, e.location);
 }
 
 abstract production orOp
 e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.errors;
-  e.patternErrors := [err(e.location, "| cannot occur in pattern expression")];
+  e.patternErrors := e1.patternErrors ++ e2.patternErrors;
   e.pp = concat([e1.pp, text("|"), e2.pp]);
   e.value = e1.value.val:or(e2.value, e.location);
+  e1.matchValue = e.matchValue;
+  e2.matchValue = e.matchValue;
+  e.matchRes = e1.matchRes.val:or(e2.matchRes, e.location);
+}
+
+abstract production notOp
+e::Expr ::= e1::Expr
+{
+  e.errors := e1.errors;
+  e.patternErrors := e1.patternErrors;
+  e.pp = cat(text("!"), e1.pp);
+  e.value =
+    case e1.value of
+      val:noneValue() -> val:trueValue()
+    | _ -> val:noneValue()
+    end;
+  e1.matchValue = e.matchValue;
+  e.matchRes = 
+    case e1.matchValue of
+      val:noneValue() -> val:trueValue()
+    | _ -> val:noneValue()
+    end;
 }
 
 abstract production matchOp
@@ -245,6 +278,14 @@ e::Expr ::= h::Expr t::Expr
   e.patternErrors := h.patternErrors ++ t.patternErrors;
   e.pp = concat([h.pp, text("::"), t.pp]);
   
+  e.value =
+    case h.value, t.value of
+      errorValue(_), _ -> h.value
+    | _, errorValue(_) -> t.value
+    | v, val:listValue(vs) -> val:listValue(v :: vs)
+    | _, _ -> val:opError("::", h.value, t.value, e.location)
+    end;
+  
   h.matchValue =
     case e.matchValue of
       val:listValue(h :: _) -> h
@@ -267,13 +308,21 @@ e::Expr ::= h::Expr t::Expr
       end
     | _ -> val:noneValue()
     end;
+}
+
+abstract production listIndex
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, "List index cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("["), e2.pp, text("]")]);
   
   e.value =
-    case h.value, t.value of
-      errorValue(_), _ -> h.value
-    | _, errorValue(_) -> t.value
-    | v, val:listValue(vs) -> val:listValue(v :: vs)
-    | _, _ -> val:opError("::", h.value, t.value, e.location)
+    case e1.value, e2.value of
+      errorValue(_), _ -> e1.value
+    | _, errorValue(_) -> e2.value
+    | val:listValue(vs), val:intValue(i) -> head(drop(i, vs))
+    | _, _ -> val:opError("List index", e1.value, e2.value, e.location)
     end;
 }
 

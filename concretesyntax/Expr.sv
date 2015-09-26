@@ -8,6 +8,11 @@ concrete productions e::Expr
     e.ast = abs:noneLiteral(location=e.location);
     e.pp = text("none");
   }
+| 'true'
+  {
+    e.ast = abs:trueLiteral(location=e.location);
+    e.pp = text("true");
+  }
 | '_'
   {
     e.ast = abs:wildcardLiteral(location=e.location);
@@ -52,6 +57,11 @@ concrete productions e::Expr
   {
     e.ast = abs:subOp(e1.ast, e2.ast, location=e.location);
     e.pp = concat([e1.pp, text("+"), e2.pp]);
+  }
+| '!' e1::Expr
+  {
+    e.ast = abs:notOp(e1.ast, location=e.location);
+    e.pp = cat(text("!"), e1.pp);
   }
 | e1::Expr '*' e2::Expr
   {
@@ -98,9 +108,9 @@ concrete productions e::Expr
     e.ast = abs:cond(cnd.ast, th.ast, el.ast, location=e.location);
     e.pp = concat([text("if"), cnd.pp, text("then"), th.pp, text("else"), el.pp]);
   }
-| e1::Expr LALBracket_t e2::Exprs ']'
+| e1::Expr LALBracket_t e2::Expr ']'
   {
-    e.ast = error("Not yet implemented");
+    e.ast = abs:listIndex(e1.ast, e2.ast, location=e.location);
     e.pp = concat([e1.pp, text("["), e2.pp, text("]")]);
   }
 | '[' el::Exprs ']'

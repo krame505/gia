@@ -40,6 +40,13 @@ v::Value ::=
   v.or = identity(_, v, _);
 }
 
+abstract production trueValue
+v::Value ::= 
+{
+  v.pp = text("true");
+  v.eq = eqTrue(_, _);
+}
+
 abstract production intValue
 v::Value ::= i::Integer
 {
@@ -70,7 +77,7 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::Env params::Params body::Body
+v::Value ::= name::String env::ValueEnv params::Params body::Body
 {
   v.pp = pp"function ${text(name)}(${params.pp})";
 }
@@ -84,7 +91,7 @@ v::Value ::= name::String children::[Value] bindings::[Pair<String Value>]
 }
 
 abstract production lazyValue
-v::Value ::= env::Env expr::Expr
+v::Value ::= env::ValueEnv expr::Expr
 {
   expr.env = env;
   forwards to expr.value;
@@ -107,8 +114,18 @@ Value ::= v::Value loc::Location
 {
   return
     case v of
-      noneValue() -> intValue(1)
+      noneValue() -> trueValue()
     | _ -> noneValue()
+    end;
+}
+
+function eqTrue
+Value ::= v::Value loc::Location
+{
+  return
+    case v of
+      noneValue() -> noneValue()
+    | _ -> trueValue()
     end;
 }
 

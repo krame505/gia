@@ -30,6 +30,7 @@ terminal StringConstant_t /[\"]([^\"]|[\\][\"])*[\"]/ lexer classes {Literal};
 -- Keywords
 terminal Wildcard_t '_'     lexer classes {Keyword};
 terminal None_t    'none'   lexer classes {Keyword};
+terminal True_t    'true'   lexer classes {Keyword};
 terminal Return_t  'return' lexer classes {Keyword};
 terminal Use_t     'use'    lexer classes {Keyword};
 terminal Lambda_t  'fn'     lexer classes {Keyword};
@@ -42,7 +43,7 @@ terminal Comma_t      ',';
 terminal Semi_t       ';';
 terminal LParen_t     '(';
 terminal LALParen_t   /\(/ precedence = 10, association = left; -- Function calls
-terminal RParen_t     ')'  precedence = 1, association = left; -- evidently, part of dangling-else?
+terminal RParen_t     ')'  precedence = 1,  association = left; -- evidently, part of dangling-else?
 terminal LALBracket_t /\[/ association = left;
 terminal LBracket_t   '[';
 terminal RBracket_t   ']';
@@ -52,20 +53,21 @@ terminal Colon_t      ':';
 terminal Assign_t     '='  lexer classes {Symbol};
 
 -- Operators
-terminal Match_t    '~'  precedence = 0, association = left, lexer classes {Symbol};
 terminal Cons_t     '::' precedence = 1, association = right, lexer classes {Symbol};
 terminal Or_t       '|'  precedence = 2, association = left, lexer classes {Symbol};
 terminal Xor_t      '^'  precedence = 3, association = left, lexer classes {Symbol};
 terminal And_t      '&'  precedence = 4, association = left, lexer classes {Symbol};
 terminal Eq_t       '==' precedence = 5, association = left, lexer classes {Symbol};
 terminal Neq_t      '!=' precedence = 5, association = left, lexer classes {Symbol};
+terminal Match_t    '~'  precedence = 5, association = left, lexer classes {Symbol};
 terminal Lt_t       '<'  precedence = 6, association = left, lexer classes {Symbol};
 terminal Gt_t       '>'  precedence = 6, association = left, lexer classes {Symbol};
 terminal Lte_t      '<=' precedence = 6, association = left, lexer classes {Symbol};
 terminal Gte_t      '>=' precedence = 6, association = left, lexer classes {Symbol};
-terminal Minus_t    '-'  precedence = 7, association = left, lexer classes {Symbol}; -- negative
-terminal Plus_t     '+'  precedence = 7, association = left,  lexer classes {Symbol}; -- positive
-terminal Star_t     '*'  precedence = 8, association = left, lexer classes {Symbol}; -- pointer, deref
+terminal Minus_t    '-'  precedence = 7, association = left, lexer classes {Symbol};
+terminal Plus_t     '+'  precedence = 7, association = left, lexer classes {Symbol};
+terminal Not_t      '!'  precedence = 7, association = left, lexer classes {Symbol};
+terminal Star_t     '*'  precedence = 8, association = left, lexer classes {Symbol};
 terminal Divide_t   '/'  precedence = 8, association = left, lexer classes {Symbol};
 terminal Mod_t      '%'  precedence = 8, association = left, lexer classes {Symbol};
 terminal Capture_t  '@'  precedence = 9, lexer classes {Symbol};
