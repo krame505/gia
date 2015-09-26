@@ -21,12 +21,14 @@ IOVal<Integer> ::= args::[String] ioIn::IO parse::(ParseResult<cnc:Root>::=Strin
 
   return
     if null(args) || null(tail(args)) || null(tail(tail(args)))
-    then ioval(print("Error: missing arguments\nThis jar should not be run manually, only called via the gia script", ioIn), 4)
+    then ioval(print("Error: missing arguments\nThis jar should not be run manually, only called via the gia script", ioIn), 5)
     else if !result.parseSuccess
-    then ioval(print(result.parseErrors ++ "\n", cst.cnc:ioOut), 3)
+    then ioval(print(result.parseErrors ++ "\n", cst.cnc:ioOut), 4)
     else if !exprResult.parseSuccess
-    then ioval(print(exprResult.parseErrors ++ "\n", cst.cnc:ioOut), 2)
+    then ioval(print(exprResult.parseErrors ++ "\n", cst.cnc:ioOut), 3)
     else if !null(ast.errors)
-    then ioval(print(messagesToString(ast.errors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.errors, false) then 1 else 0)
+    then ioval(print(messagesToString(ast.errors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.errors, false) then 2 else 0)
+    else if !null(ast.errors)
+    then ioval(print(messagesToString(ast.abs:evalErrors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.abs:evalErrors, false) then 1 else 0)
     else ioval(print(show(80, ast.abs:evalRes.abs:pp) ++ "\n", cst.cnc:ioOut), 0);
 }

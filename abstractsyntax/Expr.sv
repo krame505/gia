@@ -72,7 +72,7 @@ e::Expr ::= n::Name
   e.errors := n.lookupCheck;
   e.patternErrors := [err(e.location, "Name cannot occur in pattern expression")];
   e.pp = text(n.name);
-  e.value = n.lookup.value;
+  e.value = n.lookup;
 }
 
 abstract production capture
@@ -86,80 +86,59 @@ e::Expr ::= e1::Expr
   e.matchRes = val:listValue([e.matchValue]);
 }
 
--- We see this in the concrete syntax, need to decide if it is a function call
--- Can't use dispatch because name and env are important for node construction
 abstract production app
 e::Expr ::= f::Expr args::Exprs
 {
-  forwards to
-    case f, f.value of
-      nameLiteral(n), val:constructorValue(_, _, _) -> nodeConstruct(n, args, location=e.location)
-    | _, _ -> appFunction(f, args, location=e.location)
-    end;
-}
-
-abstract production nodeConstruct
-e::Expr ::= n::Name args::Exprs
-{
-  e.errors := n.lookupCheck ++ args.errors; -- TODO: Look up n? Check number of args?
-  e.patternErrors := args.patternErrors;
-  e.pp = concat([text(n.name), text("("), args.pp, text(")")]);
-  
-  e.value =
-    case n.lookup.value of
-      val:constructorValue(env, params, rules) ->
-        val:nodeValue(n.name, args.values, map(getRuleValue(_, bodyEnv), rules))
-    end;
-  
-  e.matchRes = 
-    case e.matchValue of
-      val:nodeValue(m, _, _) ->
-        if n.name == m
-        then args.matchRes
-        else val:noneValue()
-    | _ -> val:noneValue()
-    end;
-  
-  args.matchValues = 
-    case e.matchValue of
-      val:nodeValue(_, children, _) -> children
-    | _ -> error("Demanded match values when value type differs")
-    end;
-  
-  local bodyEnv::Env =
-    case n.lookup.value of
-      val:constructorValue(env, params, rules) ->
-        foldr(updateRuleEnv(_, bodyEnv, _), addEnv(decorate params with {args = args.values;}.defs, env), rules)
-    end;
-}
-
-function getRuleValue
-Pair<String val:Value> ::= rule::Pair<String Expr> bodyEnv::Env
-{
-  return pair(rule.fst, decorate rule.snd with {env = bodyEnv;}.value);
-}
-
-function updateRuleEnv
-Env ::= rule::Pair<String Expr> bodyEnv::Env env::Env
-{
-  return addEnv([pair(rule.fst, valueItem(decorate rule.snd with {env = bodyEnv;}.value))], env);
-}
-
-abstract production appFunction
-e::Expr ::= f::Expr args::Exprs
-{
-  e.errors := f.errors ++ args.errors;
-  e.patternErrors := [err(e.location, "Function call cannot occur in pattern expression")];
+  e.errors := 
+    (if args.len != params.len
+     then [err(e.location, s"Incorrect number of arguments (expected ${toString(params.len)}, found ${toString(args.len)})")]
+     else []) ++ params.errors ++ args.errors;
+  e.patternErrors :=
+    case f of
+      nameLiteral(n) -> []
+    | _ -> [err(f.location, "Constructor in match must be a name")]
+    end ++ args.patternErrors;
   e.pp = concat([f.pp, text("("), args.pp, text(")")]);
+  
+  local body::Body =
+    case f.value of
+      val:functionValue(_, _, _, body) -> body
+    end;
+  body.env =
+    case f.value of
+      val:functionValue(n, env, _, _) -> 
+        addEnv(params.defs ++ [pair(n, f.value)], env)
+    end;
   
   e.value =
     case f.value of
-      val:functionValue(env, params, body) ->
-        if args.len != params.len
-        then val:errorValue([err(e.location, s"Incorrect number of arguments (expected ${toString(params.len)}, found ${toString(args.len)}")])
-        else decorate body with {env = addEnv(decorate params with {args = args.values;}.defs, env);}.value
-      | _ -> val:errorValue([err(f.location, "Cannot apply non-function")])
+      val:functionValue(n, env, params, _) ->
+        case body.returnValue of
+          just(v) -> v
+        | _ -> val:nodeValue(n, args.values, body.defs)
+        end
     end;
+  
+  e.matchRes = 
+    case f, e.matchValue of
+      nameLiteral(n), val:nodeValue(m, _, _) -> 
+        if n.name == m
+        then args.matchRes
+        else val:noneValue()
+    | _, _ -> val:noneValue()
+    end;
+  
+  args.matchValue = 
+    case e.matchValue of
+      val:nodeValue(_, children, _) -> val:listValue(children)
+    | _ -> error("Demanded match values when value type differs")
+    end;
+  
+  local params::Params =
+    case f.value of
+      val:functionValue(n, env, params, body) -> params
+    end;
+  params.args = args.values;
 }
 
 abstract production lambdaExpr
@@ -173,7 +152,8 @@ e::Expr ::= params::Params body::Expr
   params.args = [];
   body.env = addEnv(params.defs, e.env);
   
-  e.value = val:functionValue(e.env, params, body);
+  local id::String = toString(genInt());
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, params, returnBody(body, location=body.location));
 }
 
 abstract production addOp
@@ -183,6 +163,42 @@ e::Expr ::= e1::Expr e2::Expr
   e.patternErrors := [err(e.location, "+ cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("+"), e2.pp]);
   e.value = e1.value.val:add(e2.value, e.location);
+}
+
+abstract production subOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, "- cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("-"), e2.pp]);
+  e.value = e1.value.val:sub(e2.value, e.location);
+}
+
+abstract production mulOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, "* cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("*"), e2.pp]);
+  e.value = e1.value.val:mul(e2.value, e.location);
+}
+
+abstract production divOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, "/ cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("/"), e2.pp]);
+  e.value = e1.value.val:div(e2.value, e.location);
+}
+
+abstract production eqOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, "== cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("=="), e2.pp]);
+  e.value = e1.value.val:eq(e2.value, e.location);
 }
 
 abstract production andOp
@@ -284,19 +300,18 @@ e::Expr ::= el::Exprs
   
   e.value = val:listValue(el.values);
   
-  el.matchValues =
+  el.matchValue =
     case e.matchValue of
-      val:listValue(vs) -> vs
-    | v -> [v]
+      val:listValue(vs) -> val:listValue(vs)
+    | v -> val:listValue([v])
     end;
   e.matchRes = el.matchRes;
 }
 
 synthesized attribute values::[val:Value];
-inherited attribute matchValues::[val:Value];
 synthesized attribute len::Integer;
 
-nonterminal Exprs with env, errors, patternErrors, pp, values, matchValues, matchRes, len;
+nonterminal Exprs with env, errors, patternErrors, pp, values, matchValue, matchRes, len;
 
 abstract production consExpr
 e::Exprs ::= h::Expr t::Exprs
@@ -306,13 +321,19 @@ e::Exprs ::= h::Expr t::Exprs
   e.pp = concat([h.pp, text(","), t.pp]);
   
   e.values = h.value :: t.values;
-  h.matchValue = head(e.matchValues);
-  t.matchValues = tail(e.matchValues);
+  h.matchValue =
+    case e.matchValue of
+      val:listValue(h :: t) -> h
+    end;
+  t.matchValue =
+    case e.matchValue of
+      val:listValue(h :: t) -> val:listValue(t)
+    end;
   e.matchRes =
-    case t.matchRes of
-      val:listValue([]) -> val:noneValue()
-    | val:listValue(vs) -> val:listValue(h.matchRes :: vs)
-    | _ -> val:noneValue()
+    case e.matchValue, h.matchRes, t.matchRes of
+      val:listValue([]), _, _ -> val:noneValue()
+    | val:listValue(_ :: _), val:listValue(vs1), val:listValue(vs2) -> val:listValue(vs1 ++ vs2)
+    | _, _, _ -> val:noneValue()
     end;
   e.len = t.len + 1;
 }
@@ -325,8 +346,8 @@ e::Exprs ::=
   e.pp = text("");
   e.values = [];
   e.matchRes =
-    case e.matchValues of
-      [] -> val:listValue([])
+    case e.matchValue of
+      val:listValue([]) -> val:listValue([])
     | _ -> val:noneValue()
     end;
   e.len = 0;

@@ -1,6 +1,6 @@
 grammar gia:abstractsyntax;
 
-nonterminal Decls with env, defs, errors, evalExpr, evalRes;
+nonterminal Decls with env, defs, errors, evalExpr, evalRes, evalErrors;
 
 abstract production consDecl
 d::Decls ::= h::Decl t::Decls
@@ -9,6 +9,7 @@ d::Decls ::= h::Decl t::Decls
   d.defs = h.defs ++ t.defs;
   t.env = addEnv(h.defs, d.env);
   d.evalRes = t.evalRes;
+  d.evalErrors = t.evalErrors;
 }
 
 abstract production nilDecl
@@ -24,6 +25,7 @@ d::Decls ::=
     if null(evalExpr.errors)
     then evalExpr.value
     else val:errorValue(evalExpr.errors);
+  d.evalErrors = evalExpr.errors;
 }
 
 abstract production parseErrorDecls
@@ -43,24 +45,23 @@ d::Decl ::= ds::Decls
   d.defs = ds.defs;
 }
 
+abstract production valDecl
+d::Decl ::= n::Name e::Expr
+{
+  d.errors := e.errors;
+  d.defs = [pair(n.name, val:lazyValue(d.env, e))];
+}
+
 abstract production nodeDecl
 d::Decl ::= n::Name p::Params b::Body
 {
   d.errors := p.errors ++ b.errors;
-  d.defs = [pair(n.name, valueItem(val:constructorValue(d.env, p, b.rules)))];
+  d.defs = [pair(n.name, val:functionValue(n.name, d.env, p, b))];
   
   -- Dummy values provided for error checking
   p.args = [];
-  b.env = addEnv(p.defs, d.env);
+  b.env = addEnv(p.defs ++ d.defs, d.env);
 }
-
-{-
-abstract production FunctionDecl
-d::Decl ::= n::Name p::Params e::Expr
-{
-  d.errors := p.errors ++ e.errors;
-}
--}
 
 inherited attribute args::[val:Value];
 nonterminal Params with env, defs, errors, pp, args, len;
@@ -77,7 +78,7 @@ p::Params ::= h::Name t::Params
   
   local callValue::val:Value = if null(p.args) then val:noneValue() else head(p.args);
   t.args = if null(p.args) then [] else tail(p.args);
-  p.defs = pair(h.name, valueItem(callValue)) :: t.defs;
+  p.defs = pair(h.name, callValue) :: t.defs;
   p.len = t.len + 1;
 }
 

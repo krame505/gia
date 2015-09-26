@@ -2,13 +2,13 @@ grammar gia:abstractsyntax;
 
 synthesized attribute name::String;
 synthesized attribute lookupCheck::[Message];
-synthesized attribute lookup::EnvItem;
+synthesized attribute lookup::Value;
 
 synthesized attribute valueLookupCheck::[Message];
-synthesized attribute valueLookup::EnvItem;
+synthesized attribute valueLookup::Value;
 
 synthesized attribute nodeLookupCheck::[Message];
-synthesized attribute nodeLookup::EnvItem;
+synthesized attribute nodeLookup::Value;
 
 nonterminal Name with env, name, pp, lookupCheck, lookup, location;
 
@@ -18,7 +18,7 @@ n::Name ::= s::String
   n.name = s;
   n.pp = text(s);
   
-  local lookupRes::[EnvItem] = lookup(s, n.env);
+  local lookupRes::[Value] = lookup(s, n.env);
   n.lookupCheck =
     if null(lookupRes)
     then [err(n.location, "Undefined " ++ s)]

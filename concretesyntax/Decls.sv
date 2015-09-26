@@ -45,7 +45,7 @@ d::Decl ::= 'use' s::StringConstant_t ';'
     then "/" ++ substring(0, filePathEndIndex, file)
     else "";
   local isF::IOVal<Boolean> = isFile(fileWithPath, d.ioIn);
-  local text::IOVal<String> = readFile(fileWithPath, text.io);
+  local text::IOVal<String> = readFile(fileWithPath, isF.io);
   local parseResult::ParseResult<Root> = d.parse(text.iovalue, file);
   local cst::Decls =
     if !isF.iovalue
@@ -58,6 +58,13 @@ d::Decl ::= 'use' s::StringConstant_t ';'
   cst.parse = d.parse;
 }
 
+concrete production valDecl
+d::Decl ::= n::Id_t '=' e::Expr ';'
+{
+  d.ast = abs:valDecl(abs:name(n.lexeme, location=n.location), e.ast, location=d.location);
+  d.ioOut = d.ioIn;
+}
+
 concrete production nodeDecl
 d::Decl ::= n::Id_t '(' p::Params ')' '{' b::Body '}'
 {
@@ -65,13 +72,12 @@ d::Decl ::= n::Id_t '(' p::Params ')' '{' b::Body '}'
   d.ioOut = d.ioIn;
 }
 
-{-
-concrete production FunctionDecl
-d::Decl ::= n::Id_t '(' p::Params ')' '{' e::Expr '}'
+concrete production nodeDeclNoBody
+d::Decl ::= n::Id_t '(' p::Params ')' b::';'
 {
-  d.ast = ...;
+  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, abs:nilBody(location=b.location), location=d.location);
+  d.ioOut = d.ioIn;
 }
--}
 
 nonterminal Params with ast<abs:Params>, location;
 
