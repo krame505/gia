@@ -30,11 +30,13 @@ function run_gia {
     LOAD_SCRIPT=""
     for FILE in $LOAD_LIST
     do
-        LOAD_SCTIPT+="use $FILE; "
+        LOAD_SCRIPT+="use \"$FILE\"; "
     done
 
     java -jar $JAR_NAME "$LOAD_SCRIPT" "User input" $@
 }
+
+run_gia "\"Loaded\""
 
 while read -e -p '(gia) ' LINE
 do
@@ -46,11 +48,16 @@ do
                 exit 0
                 ;;
             "use")
-                if [ -f $2 ]
+                if [ ! -f $2 ]
                 then
-                    LOAD_LIST+=$2
-                else
                     echo "File $2 not found"
+                elif [[ $LOAD_LIST == *$2* ]]
+                then
+                    echo "File $2 already loaded"
+                else
+                    OLD_LOAD_LIST=$LOAD_LIST
+                    LOAD_LIST+=" $2"
+                    run_gia "\"Done\"" || LOAD_LIST=$OLD_LOAD_LIST
                 fi
                 ;;
             *)
