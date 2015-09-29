@@ -1,0 +1,58 @@
+datatype BoolExpr = {isTrue : BoolExpr};
+
+True() : BoolExpr {
+  isTrue = True();
+}
+
+False() : BoolExpr {
+  isTrue = False();
+}
+
+And(a : BoolExpr, b : BoolExpr) : BoolExpr {
+  isTrue =
+    if a == b
+    then a
+    else if a.isTrue == True()
+    then b.isTrue
+    else if b.isTrue == True()
+    then a.isTrue
+    else And(a.isTrue, b.isTrue);
+}
+
+Or(a : BoolExpr, b : BoolExpr) : BoolExpr {
+  isTrue =
+    if a == b
+    then a
+    else if a.isTrue == True()
+    then True()
+    else if b.isTrue == True()
+    then True()
+    else Or(a.isTrue, b.isTrue);
+}
+
+Not(a : BoolExpr) : BoolExpr {
+  isTrue =
+    if a.isTrue == True()
+    then False()
+    else if a.isTrue == False()
+    then True()
+    else Not(a);
+}
+
+Var(a : BoolExpr) : BoolExpr {
+  isTrue = Var(a);
+}
+
+isTrue(expr : BoolExpr) {
+  matchAnd = expr ~ And(@_, @_);
+  matchOr = expr ~ Or(@_, @_);
+  matchNot = expr ~ Not(@_);
+  matchVar = expr ~ Var(@_);
+  return
+    if expr ~ True() |
+       matchAnd & isTrue(matchAnd[0]) & isTrue(matchAnd[1]) |
+       matchOr & (isTrue(matchOr[0]) | isTrue(matchOr[1])) |
+       matchNot & !isTrue(matchNot[0])
+    then true
+    else none;
+}

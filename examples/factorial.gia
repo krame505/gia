@@ -1,0 +1,5 @@
+
+fact(n : int) : int {
+  recval = fact(n - 1);
+  return if n == 0 then 1 else recval * n;
+}
