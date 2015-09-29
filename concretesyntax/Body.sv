@@ -1,6 +1,6 @@
 grammar gia:concretesyntax;
 
-nonterminal Body with ast<abs:Body>, location;
+closed nonterminal Body with ast<abs:Body>, location;
 
 concrete production consEquations
 b::Body ::= h::Equation t::Body
@@ -20,7 +20,7 @@ b::Body ::=
   b.ast = abs:nilBody(location=b.location);
 }
 
-nonterminal Equation with ast<abs:Equation>, location;
+closed nonterminal Equation with ast<abs:Equation>, location;
 
 concrete production equation
 eq::Equation ::= n::Id_t '=' e::Expr ';'

@@ -6,6 +6,12 @@ imports gia:abstractsyntax:env;
 imports silver:langutil hiding pp;
 imports silver:langutil:pp with implode as ppImplode;
 
+type ValueEnv = Env<Value>;
+type ValueDef = Def<Value>;
+
+autocopy attribute env::ValueEnv;
+synthesized attribute defs::[ValueDef];
+
 synthesized attribute add::(Value ::= Value Location);
 synthesized attribute sub::(Value ::= Value Location);
 synthesized attribute mul::(Value ::= Value Location);
@@ -80,6 +86,7 @@ abstract production functionValue
 v::Value ::= name::String env::ValueEnv params::Params body::Body
 {
   v.pp = pp"function ${text(name)}(${params.pp})";
+  v.eq = opError("==", v, _, _);
 }
 
 abstract production nodeValue
@@ -94,6 +101,7 @@ abstract production lazyValue
 v::Value ::= env::ValueEnv expr::Expr
 {
   expr.env = env;
+  expr.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
   forwards to expr.value;
 }
 
@@ -101,6 +109,7 @@ abstract production errorValue
 v::Value ::= msgs::[Message]
 {
   v.pp = text(implode("\n", map((.message), msgs)));
+  v.eq = identity(v, _, _);
 }
 
 function identity
@@ -189,7 +198,7 @@ Value ::= i::Integer v::Value loc::Location
 {
   return
     case v of
-      intValue(j) -> if i == j then intValue(1) else noneValue()
+      intValue(j) -> if i == j then trueValue() else noneValue()
     | _ -> opError("==", intValue(i), v, loc)
     end;
 }
@@ -199,7 +208,7 @@ Value ::= i::Integer v::Value loc::Location
 {
   return
     case v of
-      intValue(j) -> if i > j then intValue(1) else noneValue()
+      intValue(j) -> if i > j then trueValue() else noneValue()
     | _ -> opError(">", intValue(i), v, loc)
     end;
 }
@@ -233,7 +242,7 @@ Value ::= s::String v::Value loc::Location
 {
   return
     case v of
-      strValue(t) -> if s == t then intValue(1) else noneValue()
+      strValue(t) -> if s == t then trueValue() else noneValue()
     | _ -> opError("==", strValue(s), v, loc)
     end;
 }
@@ -244,7 +253,6 @@ Value ::= l::[Value] v::Value loc::Location
   return
     case l, v of
       _, listValue(m) -> listValue(l ++ m)
-    | w :: [], _ -> w.add(v, loc)
     | _, _ -> opError("+", listValue(l), v, loc)
     end;
 }
@@ -268,7 +276,7 @@ Value ::= l::[Value] v::Value loc::Location
   return
     case l, v of
       w :: t1, listValue(x :: t2) -> and(w.eq(x, loc), eqList(t1, listValue(t2), loc), loc)
-    | [], listValue([]) -> intValue(1)
+    | [], listValue([]) -> trueValue()
     | _, listValue([]) -> noneValue()
     | [], listValue(_) -> noneValue()
     | _, _ -> opError("==", listValue(l), v, loc)
@@ -293,7 +301,7 @@ Value ::= n::String l::[Value] v::Value loc::Location
 {
   return
     case v of
-      nodeValue(n1, l1, _) -> if n == n1 then eqList(l, v, loc) else noneValue()
+      nodeValue(n1, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else noneValue()
     | _ -> opError("==", nodeValue(n, l, []), v, loc)
     end;
 }

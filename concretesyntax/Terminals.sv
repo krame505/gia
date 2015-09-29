@@ -28,15 +28,21 @@ terminal IntConstant_t    /[\-]?[0-9]+/ lexer classes {Literal};
 terminal StringConstant_t /[\"]([^\"]|[\\][\"])*[\"]/ lexer classes {Literal};
 
 -- Keywords
-terminal Wildcard_t '_'     lexer classes {Keyword};
-terminal None_t    'none'   lexer classes {Keyword};
-terminal True_t    'true'   lexer classes {Keyword};
-terminal Return_t  'return' lexer classes {Keyword};
-terminal Use_t     'use'    lexer classes {Keyword};
-terminal Lambda_t  'fn'     lexer classes {Keyword};
-terminal If_t      'if'     lexer classes {Keyword};
-terminal Then_t    'then'   lexer classes {Keyword};
-terminal Else_t    'else'   lexer classes {Keyword}, precedence = 0, association = left;
+terminal Use_t      'use'      lexer classes {Keyword};
+terminal Type_t     'type'     lexer classes {Keyword};
+terminal DataType_t 'datatype' lexer classes {Keyword};
+terminal Wildcard_t '_'        lexer classes {Keyword};
+terminal None_t     'none'     lexer classes {Keyword};
+terminal True_t     'true'     lexer classes {Keyword};
+terminal Return_t   'return'   lexer classes {Keyword};
+terminal Lambda_t   'fn'       lexer classes {Keyword};
+terminal If_t       'if'       lexer classes {Keyword};
+terminal Then_t     'then'     lexer classes {Keyword};
+terminal Else_t     'else'     lexer classes {Keyword}, precedence = 0, association = left;
+
+terminal Any_t     'any'     lexer classes {Keyword};
+terminal Int_t     'int'     lexer classes {Keyword};
+terminal Str_t     'str'     lexer classes {Keyword};
 
 -- Structural symbols
 terminal Comma_t      ',';
@@ -72,3 +78,6 @@ terminal Divide_t   '/'  precedence = 8, association = left, lexer classes {Symb
 terminal Mod_t      '%'  precedence = 8, association = left, lexer classes {Symbol};
 terminal Capture_t  '@'  precedence = 9, lexer classes {Symbol};
 terminal Dot_t      '.'  precedence = 9;
+
+-- Type operators
+terminal Arrow_t   '->'  precedence = 1, association = left, lexer classes {Symbol};

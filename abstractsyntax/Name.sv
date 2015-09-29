@@ -4,12 +4,6 @@ synthesized attribute name::String;
 synthesized attribute lookupCheck::[Message];
 synthesized attribute lookup::Value;
 
-synthesized attribute valueLookupCheck::[Message];
-synthesized attribute valueLookup::Value;
-
-synthesized attribute nodeLookupCheck::[Message];
-synthesized attribute nodeLookup::Value;
-
 nonterminal Name with env, name, pp, lookupCheck, lookup, location;
 
 abstract production name

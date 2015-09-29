@@ -5,7 +5,7 @@ synthesized attribute value::val:Value;
 inherited attribute matchValue::val:Value;
 synthesized attribute matchRes::val:Value;
 
-nonterminal Expr with env, errors, patternErrors, pp, value, matchValue, matchRes, location;
+nonterminal Expr with val:env, errors, patternErrors, pp, value, matchValue, matchRes, location;
 
 aspect default production
 e::Expr ::=
@@ -112,6 +112,7 @@ e::Expr ::= f::Expr args::Exprs
     case f.value of
       val:functionValue(_, _, _, body) -> body
     end;
+  body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
   body.env =
     case f.value of
       val:functionValue(n, env, _, _) -> 
@@ -147,6 +148,8 @@ e::Expr ::= f::Expr args::Exprs
       val:functionValue(n, env, params, body) -> params
     end;
   params.args = args.values;
+  params.typeEnv = e.typeEnv;
+  params.typeNameEnv = e.typeNameEnv;
 }
 
 abstract production lambdaExpr

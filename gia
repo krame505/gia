@@ -48,7 +48,7 @@ do
                 exit 0
                 ;;
             "reload")
-                run_gia "Done"
+                run_gia "\"Done\""
                 ;;
             "use")
                 if [ ! -f $2 ]

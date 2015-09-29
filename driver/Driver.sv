@@ -30,5 +30,8 @@ IOVal<Integer> ::= args::[String] ioIn::IO parse::(ParseResult<cnc:Root>::=Strin
     then ioval(print(messagesToString(ast.errors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.errors, false) then 2 else 0)
     else if !null(ast.errors)
     then ioval(print(messagesToString(ast.abs:evalErrors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.abs:evalErrors, false) then 1 else 0)
-    else ioval(print(show(80, ast.abs:evalRes.abs:pp) ++ "\n", cst.cnc:ioOut), 0);
+    else case ast.abs:evalRes of
+      abs:errorValue(_) -> ioval(print("Errors:\n" ++ show(80, ast.abs:evalRes.abs:pp) ++ "\n", cst.cnc:ioOut), 0)
+    | _ -> ioval(print(show(80, ast.abs:evalRes.abs:pp) ++ " : " ++ show(80, ast.abs:evalResType.abs:pp) ++ "\n", cst.cnc:ioOut), 0)
+    end;
 }

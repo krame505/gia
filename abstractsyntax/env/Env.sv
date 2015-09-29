@@ -7,26 +7,6 @@ imports silver:util:raw:treemap as tm;
 type Env<a> = tm:Map<String a>;
 type Def<a> = Pair<String a>;
 
-type ValueEnv = Env<Value>;
-type ValueDef = Def<Value>;
-
---type TypeEnv = Env<Type>;
---type TypeDef = Def<Type>;
-
-autocopy attribute env::ValueEnv;
-synthesized attribute defs::[ValueDef];
-
---autocopy attribute typeEnv::TypeEnv;
---synthesized attribute typeDefs::[TypeDef];
-{-
-nonterminal EnvItem with value;
-
-abstract production valueItem
-ei::EnvItem ::= v::Value
-{
-  ei.value = v;
-}
--}
 function emptyEnv
 Env<a> ::=
 {
@@ -43,4 +23,17 @@ function lookup
 [a] ::= n::String e::Env<a>
 {
   return tm:lookup(n, e);
+}
+
+function lookupList
+Maybe<a> ::= n::String e::[Pair<String a>]
+{
+  return
+    case e of
+      [] -> nothing()
+    | pair(n1, h) :: t ->
+      if n == n1
+      then just(h)
+      else lookupList(n, t)
+    end;
 }

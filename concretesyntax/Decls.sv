@@ -65,30 +65,44 @@ d::Decl ::= n::Id_t '=' e::Expr ';'
   d.ioOut = d.ioIn;
 }
 
-concrete production nodeDecl
-d::Decl ::= n::Id_t '(' p::Params ')' '{' b::Body '}'
+concrete production typeDecl
+d::Decl ::= 'type' n::Id_t '=' te::TypeExpr ';'
 {
-  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, b.ast, location=d.location);
+  d.ast = abs:typeDecl(abs:name(n.lexeme, location=n.location), te.ast, location=d.location);
+  d.ioOut = d.ioIn;
+}
+
+concrete production dataTypeDecl
+d::Decl ::= 'datatype' n::Id_t '=' te::TypeExpr ';'
+{
+  d.ast = abs:dataTypeDecl(abs:name(n.lexeme, location=n.location), te.ast, location=d.location);
+  d.ioOut = d.ioIn;
+}
+
+concrete production nodeDecl
+d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr '{' b::Body '}'
+{
+  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, b.ast, location=d.location);
   d.ioOut = d.ioIn;
 }
 
 concrete production nodeDeclNoBody
-d::Decl ::= n::Id_t '(' p::Params ')' b::';'
+d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::';'
 {
-  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, abs:nilBody(location=b.location), location=d.location);
+  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, abs:nilBody(location=b.location), location=d.location);
   d.ioOut = d.ioIn;
 }
 
-nonterminal Params with ast<abs:Params>, location;
+closed nonterminal Params with ast<abs:Params>, location;
 
 concrete productions p::Params
-| h::Id_t ',' t::Params
+| h::Id_t  mte::MaybeTypeExpr',' t::Params
   {
-    p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), t.ast);
+    p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), mte.ast, t.ast);
   }
-| h::Id_t
+| h::Id_t mte::MaybeTypeExpr
   {
-    p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), abs:nilParam());
+    p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), mte.ast, abs:nilParam());
   }
 |
   {

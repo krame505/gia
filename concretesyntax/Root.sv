@@ -11,7 +11,7 @@ autocopy attribute parse::(ParseResult<Root> ::= String String);
 inherited attribute ioIn::IO;
 synthesized attribute ioOut::IO;
 
-nonterminal Root with ast<abs:Root>, ioIn, ioOut, currentDir, parse;
+closed nonterminal Root with ast<abs:Root>, ioIn, ioOut, currentDir, parse;
 
 concrete production root
 r::Root ::= d::Decls
