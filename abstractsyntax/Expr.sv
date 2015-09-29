@@ -155,7 +155,7 @@ e::Expr ::= f::Expr args::Exprs
 abstract production lambdaExpr
 e::Expr ::= params::Params body::Expr
 {
-  e.errors := params.errors ++ body.errors; -- TODO: Look up n? Check number of args?
+  e.errors := params.errors ++ body.errors;
   e.patternErrors := [err(e.location, "Lambda cannot occur in pattern expression")];
   e.pp = concat([text("fn (<params>)"), text("("), body.pp, text(")")]); -- TODO
   

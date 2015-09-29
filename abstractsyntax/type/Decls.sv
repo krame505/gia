@@ -86,7 +86,7 @@ aspect production consParam
 p::Params ::= h::Name mte::MaybeTypeExpr t::Params
 {
   p.errors <- mte.errors;
-  p.typeDefs = pair(h.name, anyType()) :: t.typeDefs; -- TODO: Typed params
+  p.typeDefs = pair(h.name, mte.type) :: t.typeDefs; -- TODO: Typed params
   p.types = mte.type :: t.types;
 }
 
