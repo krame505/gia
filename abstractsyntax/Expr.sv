@@ -11,23 +11,7 @@ aspect default production
 e::Expr ::=
 {
   e.patternErrors := [];
-  e.matchRes = val:noneValue();
-}
-
-abstract production noneLiteral
-e::Expr ::= 
-{
-  e.errors := [];
-  e.pp = text("none");
-  e.value = val:noneValue();
-}
-
-abstract production trueLiteral
-e::Expr ::= 
-{
-  e.errors := [];
-  e.pp = text("true");
-  e.value = val:trueValue();
+  e.matchRes = val:constructNone();
 }
 
 abstract production valueExpr
@@ -39,6 +23,45 @@ e::Expr ::= v::val:Value
   e.matchRes = error("Matching on valueExpr");
 }
 
+abstract production errorExpr
+e::Expr ::= e1::Expr
+{
+  e.errors := e1.errors;
+  e.pp = pp"error(${e1.pp})";
+  e.value =
+    case e1.value of
+      val:strValue(s) -> val:errorValue([err(e.location, s)])
+    | _ -> val:errorValue([err(e1.location, "Invalid type to error")])
+    end;
+  e.matchRes = error("Matching on valueExpr");
+}
+
+abstract production trueLiteral
+e::Expr ::= 
+{
+  e.errors := [];
+  e.pp = text("true");
+  e.value = val:trueValue();
+  e.matchRes = 
+    case e.matchValue of
+      val:trueValue() ->  val:constructSome(val:listValue([]))
+    | _ -> val:constructNone()
+    end;
+}
+
+abstract production falseLiteral
+e::Expr ::= 
+{
+  e.errors := [];
+  e.pp = text("false");
+  e.value = val:falseValue();
+  e.matchRes = 
+    case e.matchValue of
+      val:falseValue() ->  val:constructSome(val:listValue([]))
+    | _ -> val:constructNone()
+    end;
+}
+
 abstract production intLiteral
 e::Expr ::= i::Integer
 {
@@ -47,8 +70,8 @@ e::Expr ::= i::Integer
   e.value = val:intValue(i);
   e.matchRes =
     case e.matchValue of
-      val:intValue(j) -> if i == j then val:listValue([]) else val:noneValue()
-    | _ -> val:noneValue()
+      val:intValue(j) -> if i == j then val:constructSome(val:listValue([])) else val:constructNone()
+    | _ -> val:constructNone()
     end;
 }
 
@@ -60,8 +83,8 @@ e::Expr ::= s::String
   e.value = val:strValue(s);
   e.matchRes =
     case e.matchValue of
-      val:strValue(t) -> if s == t then val:listValue([]) else val:noneValue()
-    | _ -> val:noneValue()
+      val:strValue(t) -> if s == t then val:listValue([]) else val:constructNone()
+    | _ -> val:constructNone()
     end;
 }
 
@@ -70,8 +93,8 @@ e::Expr ::=
 {
   e.errors := [err(e.location, "Wildcard cannot occur in non-pattern expression")];
   e.pp = text("_");
-  e.value = val:noneValue();
-  e.matchRes = val:listValue([]);
+  e.value = error("Wildcard does not have a value");
+  e.matchRes = val:constructSome(val:listValue([]));
 }
 
 abstract production nameLiteral
@@ -91,16 +114,17 @@ e::Expr ::= e1::Expr
   e.pp = cat(text("@"), e1.pp);
   e.value = e1.value;
   e1.matchValue = e.matchValue;
-  e.matchRes = val:listValue([e.matchValue]);
+  e.matchRes =
+    case e1.matchRes.access(name("value", location=bogusLocation), bogusLocation) of
+      listValue(vs) -> val:constructSome(val:listValue(e.matchValue :: vs))
+    | _ -> val:constructNone()
+    end;
 }
 
 abstract production app
 e::Expr ::= f::Expr args::Exprs
 {
-  e.errors := 
-    (if args.len != params.len
-     then [err(e.location, s"Incorrect number of arguments (expected ${toString(params.len)}, found ${toString(args.len)})")]
-     else []) ++ params.errors ++ args.errors;
+  e.errors := f.errors ++ args.errors;
   e.patternErrors :=
     case f of
       nameLiteral(n) -> []
@@ -133,8 +157,8 @@ e::Expr ::= f::Expr args::Exprs
       nameLiteral(n), val:nodeValue(m, _, _) -> 
         if n.name == m
         then args.matchRes
-        else val:noneValue()
-    | _, _ -> val:noneValue()
+        else val:constructNone()
+    | _, _ -> val:constructNone()
     end;
   
   args.matchValue = 
@@ -221,7 +245,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.value = e1.value.val:and(e2.value, e.location);
   e1.matchValue = e.matchValue;
   e2.matchValue = e.matchValue;
-  e.matchRes = e1.matchRes.val:and(e2.matchRes, e.location);
+  e.matchRes = e1.matchRes.val:and(e2.matchRes, e.location); -- TODO
 }
 
 abstract production orOp
@@ -233,7 +257,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.value = e1.value.val:or(e2.value, e.location);
   e1.matchValue = e.matchValue;
   e2.matchValue = e.matchValue;
-  e.matchRes = e1.matchRes.val:or(e2.matchRes, e.location);
+  e.matchRes = e1.matchRes.val:or(e2.matchRes, e.location); -- TODO
 }
 
 abstract production notOp
@@ -244,14 +268,15 @@ e::Expr ::= e1::Expr
   e.pp = cat(text("!"), e1.pp);
   e.value =
     case e1.value of
-      val:noneValue() -> val:trueValue()
-    | _ -> val:noneValue()
+      val:falseValue() -> val:trueValue()
+    | val:trueValue() -> val:falseValue()
+    | _ -> errorValue([err(e1.location, "Invalid type to not")])
     end;
   e1.matchValue = e.matchValue;
   e.matchRes = 
-    case e1.matchValue of
-      val:noneValue() -> val:trueValue()
-    | _ -> val:noneValue()
+    case e1.matchValue.access(name("hasValue", location=bogusLocation), bogusLocation) of
+      val:falseValue() -> val:constructSome(val:listValue([]))
+    | val:trueValue() -> val:constructNone()
     end;
 }
 
@@ -304,12 +329,12 @@ e::Expr ::= h::Expr t::Expr
   e.matchRes =
     case e.matchValue of
       val:listValue(_) ->
-      case h.matchRes, t.matchRes of
-        val:listValue(vs1), val:listValue(vs2) -> val:listValue(vs1 ++ vs2)
-      | val:noneValue(), _ -> val:noneValue()
-      | _, val:noneValue() -> val:noneValue()
+      case h.matchRes.access(name("value", location=bogusLocation), bogusLocation),
+           t.matchRes.access(name("value", location=bogusLocation), bogusLocation) of
+        val:listValue(vs1), val:listValue(vs2) -> val:constructSome(val:listValue(vs1 ++ vs2))
+      | _, _ -> val:constructNone()
       end
-    | _ -> val:noneValue()
+    | _ -> val:constructNone()
     end;
 }
 
@@ -338,8 +363,9 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
   
   e.value =
     case cnd.value of
-      val:noneValue() -> el.value
-    | _ -> th.value
+      val:trueValue() -> th.value
+    | val:falseValue() -> el.value
+    | _ -> errorValue([err(cnd.location, "Invalid type to conditional")])
     end;
 }
 
@@ -382,10 +408,12 @@ e::Exprs ::= h::Expr t::Exprs
       val:listValue(h :: t) -> val:listValue(t)
     end;
   e.matchRes =
-    case e.matchValue, h.matchRes, t.matchRes of
-      val:listValue([]), _, _ -> val:noneValue()
-    | val:listValue(_ :: _), val:listValue(vs1), val:listValue(vs2) -> val:listValue(vs1 ++ vs2)
-    | _, _, _ -> val:noneValue()
+    case e.matchValue,
+         h.matchRes.access(name("value", location=bogusLocation), bogusLocation),
+         t.matchRes.access(name("value", location=bogusLocation), bogusLocation) of
+      val:listValue([]), _, _ -> val:constructSome(val:listValue([]))
+    | val:listValue(_ :: _), val:listValue(vs1), val:listValue(vs2) -> val:constructSome(val:listValue(vs1 ++ vs2))
+    | _, _, _ -> val:constructNone()
     end;
   e.len = t.len + 1;
 }
@@ -399,8 +427,8 @@ e::Exprs ::=
   e.values = [];
   e.matchRes =
     case e.matchValue of
-      val:listValue([]) -> val:listValue([])
-    | _ -> val:noneValue()
+      val:listValue([]) -> val:constructSome(val:listValue([]))
+    | _ -> val:constructNone()
     end;
   e.len = 0;
 }

@@ -32,13 +32,36 @@ d::Decl ::= n::Name te::TypeExpr
 }
 
 aspect production dataTypeDecl
-d::Decl ::= n::Name te::TypeExpr
+d::Decl ::= n::Name te::TypeExpr extends::Maybe<TypeExpr>
 {
+  d.errors <-
+    case te.type of
+      structureType(_) -> []
+    | _ -> [err(te.location, "Type expression in datatype declaration must be a structure")]
+    end ++ 
+    case extends of
+      just(nameTypeExpr(n1)) ->
+        if null(n1.typeNameLookupCheck)
+        then case n1.typeNameLookup of
+               dataType(_, _) -> []
+             | _ -> [err(te.location, "Extended type in datatype declaration must be a datatype")]
+             end
+        else []
+    | nothing() -> []
+    | _ -> []
+    end;
   d.typeDefs = [];
   d.typeNameDefs = 
-    case te.type of
-      structureType(fields) -> [pair(n.name, dataType(n, fields))]
-    | _ -> [pair(n.name, anyType())]
+    case te.type, extends of
+      structureType(fields), just(nameTypeExpr(n1)) ->
+        if null(n1.typeNameLookupCheck)
+        then case n1.typeNameLookup of
+               dataType(_, extendedFields) -> [pair(n.name, dataType(n, fields ++ extendedFields))]
+             | _ -> [pair(n.name, anyType())]
+             end
+        else [pair(n.name, anyType())]
+    | structureType(fields), _ -> [pair(n.name, dataType(n, fields))]
+    | _, _ -> [pair(n.name, anyType())]
     end;
   te.typeNameEnv = addEnv(d.typeNameDefs, d.typeNameEnv);
 }
@@ -78,7 +101,10 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Body
   d.typeNameDefs = [];
   
   -- Dummy values provided for error checking
-  b.typeEnv = addEnv(p.typeDefs ++ d.typeDefs, d.typeEnv);
+  b.typeEnv =
+    if !mte.isJust
+    then addEnv(p.typeDefs ++ [pair(n.name, functionType(p.types, anyType()))], d.typeEnv)
+    else addEnv(p.typeDefs ++ d.typeDefs, d.typeEnv);
   b.typeNameEnv = d.typeNameEnv;
 }
 

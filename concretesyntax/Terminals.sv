@@ -32,15 +32,18 @@ terminal Use_t      'use'      lexer classes {Keyword};
 terminal Type_t     'type'     lexer classes {Keyword};
 terminal DataType_t 'datatype' lexer classes {Keyword};
 terminal Wildcard_t '_'        lexer classes {Keyword};
-terminal None_t     'none'     lexer classes {Keyword};
 terminal True_t     'true'     lexer classes {Keyword};
+terminal False_t    'false'    lexer classes {Keyword};
+terminal Error_t    'error'    lexer classes {Keyword};
 terminal Return_t   'return'   lexer classes {Keyword};
+terminal Extends_t  'extends'  lexer classes {Keyword};
 terminal Lambda_t   'fn'       lexer classes {Keyword};
 terminal If_t       'if'       lexer classes {Keyword};
 terminal Then_t     'then'     lexer classes {Keyword};
 terminal Else_t     'else'     lexer classes {Keyword}, precedence = 0, association = left;
 
 terminal Any_t     'any'     lexer classes {Keyword};
+terminal Bool_t    'bool'    lexer classes {Keyword};
 terminal Int_t     'int'     lexer classes {Keyword};
 terminal Str_t     'str'     lexer classes {Keyword};
 
@@ -80,4 +83,5 @@ terminal Capture_t  '@'  precedence = 9, lexer classes {Symbol};
 terminal Dot_t      '.'  precedence = 9;
 
 -- Type operators
-terminal Arrow_t   '->'  precedence = 1, association = left, lexer classes {Symbol};
+terminal Arrow_t    '->'  precedence = 1, association = left, lexer classes {Symbol};
+terminal Question_t '?'   precedence = 2, association = left, lexer classes {Symbol};

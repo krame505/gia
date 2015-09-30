@@ -32,18 +32,9 @@ v::Value ::=
   v.mul = opError("*", v, _, _);
   v.div = opError("/", v, _, _);
   v.gt = opError(">", v, _, _);
-  v.and = and(v, _, _); -- a & b = a iff b != none
-  v.or = identity(v, _, _); -- a | b = a iff a != none
+  v.and = opError("&", v, _, _);
+  v.or = opError("|", v, _, _);
   v.access = nameOpError(".", v, _, _);
-}
-
-abstract production noneValue
-v::Value ::= 
-{
-  v.pp = text("none");
-  v.eq = eqNone(_, _);
-  v.and = identity(v, _, _);
-  v.or = identity(_, v, _);
 }
 
 abstract production trueValue
@@ -51,6 +42,17 @@ v::Value ::=
 {
   v.pp = text("true");
   v.eq = eqTrue(_, _);
+  v.and = and(v, _, _);
+  v.or = identity(v, _, _);
+}
+
+abstract production falseValue
+v::Value ::= 
+{
+  v.pp = text("false");
+  v.eq = eqFalse(_, _);
+  v.and = identity(v, _, _);
+  v.or = identity(_, v, _);
 }
 
 abstract production intValue
@@ -118,23 +120,23 @@ Value ::= v1::Value v2::Value loc::Location
   return v1;
 }
 
-function eqNone
-Value ::= v::Value loc::Location
-{
-  return
-    case v of
-      noneValue() -> trueValue()
-    | _ -> noneValue()
-    end;
-}
-
 function eqTrue
 Value ::= v::Value loc::Location
 {
   return
     case v of
-      noneValue() -> noneValue()
+      falseValue() -> falseValue()
     | _ -> trueValue()
+    end;
+}
+
+function eqFalse
+Value ::= v::Value loc::Location
+{
+  return
+    case v of
+      falseValue() -> trueValue()
+    | _ -> falseValue()
     end;
 }
 
@@ -143,8 +145,8 @@ Value ::= v1::Value v2::Value loc::Location
 {
   return
     case v1, v2 of
-      noneValue(), _ -> noneValue()
-    | _, noneValue() -> noneValue()
+      falseValue(), _ -> falseValue()
+    | _, falseValue() -> falseValue()
     | _, _ -> v1
     end;
 }
@@ -198,7 +200,7 @@ Value ::= i::Integer v::Value loc::Location
 {
   return
     case v of
-      intValue(j) -> if i == j then trueValue() else noneValue()
+      intValue(j) -> if i == j then trueValue() else falseValue()
     | _ -> opError("==", intValue(i), v, loc)
     end;
 }
@@ -208,7 +210,7 @@ Value ::= i::Integer v::Value loc::Location
 {
   return
     case v of
-      intValue(j) -> if i > j then trueValue() else noneValue()
+      intValue(j) -> if i > j then trueValue() else falseValue()
     | _ -> opError(">", intValue(i), v, loc)
     end;
 }
@@ -242,7 +244,7 @@ Value ::= s::String v::Value loc::Location
 {
   return
     case v of
-      strValue(t) -> if s == t then trueValue() else noneValue()
+      strValue(t) -> if s == t then trueValue() else falseValue()
     | _ -> opError("==", strValue(s), v, loc)
     end;
 }
@@ -277,8 +279,8 @@ Value ::= l::[Value] v::Value loc::Location
     case l, v of
       w :: t1, listValue(x :: t2) -> and(w.eq(x, loc), eqList(t1, listValue(t2), loc), loc)
     | [], listValue([]) -> trueValue()
-    | _, listValue([]) -> noneValue()
-    | [], listValue(_) -> noneValue()
+    | _, listValue([]) -> falseValue()
+    | [], listValue(_) -> falseValue()
     | _, _ -> opError("==", listValue(l), v, loc)
     end;
 }
@@ -301,7 +303,7 @@ Value ::= n::String l::[Value] v::Value loc::Location
 {
   return
     case v of
-      nodeValue(n1, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else noneValue()
+      nodeValue(n1, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else falseValue()
     | _ -> opError("==", nodeValue(n, l, []), v, loc)
     end;
 }
@@ -325,4 +327,17 @@ Value ::= op::String v1::Value v2::Value loc::Location
     | _, errorValue(_) -> v2
     | _, _ -> errorValue([err(loc, s"${op} undefined for ${show(80, v1.pp)} and ${show(80, v2.pp)}")])
     end;
+}
+
+-- Util
+function constructSome
+Value ::= v::Value
+{
+  return nodeValue("Some", [v], [pair("hasValue", trueValue()), pair("value", v)]);
+}
+
+function constructNone
+Value ::= 
+{
+  return nodeValue("None", [], [pair("hasValue", falseValue()), pair("value", errorValue([err(bogusLocation, "Demanded value from None")]))]);
 }

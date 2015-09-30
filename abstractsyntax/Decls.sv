@@ -61,7 +61,7 @@ d::Decl ::= n::Name te::TypeExpr
 }
 
 abstract production dataTypeDecl
-d::Decl ::= n::Name te::TypeExpr
+d::Decl ::= n::Name te::TypeExpr extends::Maybe<TypeExpr>
 {
   d.errors :=
     case te.type of
@@ -102,7 +102,7 @@ p::Params ::= h::Name mte::MaybeTypeExpr t::Params
   
   p.pp = if t.len > 0 then concat([h.pp, text(", "), t.pp]) else h.pp;
   
-  local callValue::val:Value = if null(p.args) then val:noneValue() else head(p.args);
+  local callValue::val:Value = if null(p.args) then val:falseValue() else head(p.args);
   t.args = if null(p.args) then [] else tail(p.args);
   p.defs = pair(h.name, callValue) :: t.defs;
   p.len = t.len + 1;

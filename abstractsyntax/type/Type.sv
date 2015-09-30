@@ -23,6 +23,12 @@ t::Type ::=
   t.pp = text("any");
 }
 
+abstract production boolType
+t::Type ::=
+{
+  t.pp = text("bool");
+}
+
 abstract production intType
 t::Type ::=
 {
@@ -38,7 +44,11 @@ t::Type ::=
 abstract production listType
 t::Type ::= t1::Type
 {
-  t.pp = pp"${t1.pp}*";
+  t.pp =
+    case t1 of
+      functionType(_, _) -> pp"[${t1.pp}]*"
+    | _ -> pp"${t1.pp}*"
+    end;
 }
 
 abstract production structureType
@@ -118,6 +128,16 @@ function convertTypeErrors
     end;
 }
 
+function convertTypeExpectedErrors
+[Message] ::= t1::Type t2::Type op::String loc::Location
+{
+  return
+    case convertType(t1, t2) of
+      just(t) -> []
+    | nothing() -> [err(loc, s"Incompatible type for ${op}: ${show(80, t1.pp)} (expected ${show(80, t2.pp)})")]
+    end;
+}
+
 function convertTypeOrAny
 Type ::= t1::Type t2::Type
 {
@@ -135,10 +155,16 @@ Maybe<Type> ::= t1::Type t2::Type
     case t1, t2 of
       _, anyType() -> just(t1)
     | anyType(), _ -> just(t2)
+    | boolType(), boolType() -> just(t1)
     | intType(), intType() -> just(t1)
     | intType(), strType() -> just(t2)
     | strType(), strType() -> just(t1)
     | listType(s1), listType(s2) -> convertType(s1, s2)
+    | functionType(p1, r1), functionType(p2, r2) ->
+        case convertParams(p1, p2), convertType(r1, r2) of
+          just(p), just(r) -> just(functionType(p, r))
+        | _, _ -> nothing()
+        end
     | structureType(f1), structureType(f2) -> 
         case convertFields(f1, f2) of
           nothing() -> nothing()
@@ -157,6 +183,21 @@ Maybe<Type> ::= t1::Type t2::Type
     end;
 }
 
+function convertParams
+Maybe<[Type]> ::= f1::[Type] f2::[Type]
+{
+  return
+    case f1, f2 of
+      [], [] -> just([])
+    | h1 :: t1, h2 :: t2 -> 
+        case convertType(h1, h2), convertParams(t1, t2) of
+          just(h), just(t) -> just(h :: t)
+        | _, _ -> nothing()
+        end
+    | _, _ -> nothing()
+    end;
+}
+
 function convertFields
 Maybe<[Pair<String Type>]> ::= f1::[Pair<String Type>] f2::[Pair<String Type>]
 {
@@ -164,15 +205,15 @@ Maybe<[Pair<String Type>]> ::= f1::[Pair<String Type>] f2::[Pair<String Type>]
     case f2 of
       [] -> just([])
     | pair(n, h) :: t ->
-      let lookupRes::[Pair<String Type>] = filter(fieldEq(pair(n, h), _), f1)
-      in if null(lookupRes)
-         then nothing()
-         else
-           case convertType(head(lookupRes).snd, h), convertFields(f1, t)  of
-             just(t1), just(rest) -> just(pair(n, t1) :: rest)
-           | _, _-> nothing()
-           end
-      end
+        let lookupRes::[Pair<String Type>] = filter(fieldEq(pair(n, h), _), f1)
+        in if null(lookupRes)
+           then nothing()
+           else
+             case convertType(head(lookupRes).snd, h), convertFields(f1, t)  of
+               just(t1), just(rest) -> just(pair(n, t1) :: rest)
+             | _, _-> nothing()
+             end
+        end
     end;
 }
 

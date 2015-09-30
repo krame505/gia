@@ -16,7 +16,9 @@ case `uname` in
   ;;
 esac
 
-JAR_NAME=$("$READLINK" -f "${BASH_SOURCE}").jar
+SRC=$("$READLINK" -f "${BASH_SOURCE}")
+HOME_DIR=${SRC%/*}
+JAR_NAME=$HOME_DIR/gia.jar
 
 if [ ! -f "$JAR_NAME" ]; then
   echo "Couldn't find the gia jars to execute, aborting."
@@ -24,7 +26,9 @@ if [ ! -f "$JAR_NAME" ]; then
   exit 2
 fi
 
-LOAD_LIST=$@
+STDLIB=$HOME_DIR/lib/stdlib.gia
+
+LOAD_LIST="$STDLIB $@"
 
 function run_gia {
     LOAD_SCRIPT=""

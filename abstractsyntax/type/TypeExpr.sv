@@ -11,6 +11,13 @@ te::TypeExpr ::=
   te.type = anyType();
 }
 
+abstract production boolTypeExpr
+te::TypeExpr ::=
+{
+  te.errors := [];
+  te.type = boolType();
+}
+
 abstract production intTypeExpr
 te::TypeExpr ::=
 {
@@ -30,6 +37,17 @@ te::TypeExpr ::= te1::TypeExpr
 {
   te.errors := te1.errors;
   te.type = listType(te1.type);
+}
+
+abstract production maybeTypeExpr
+te::TypeExpr ::= te1::TypeExpr
+{
+  te.errors := te1.errors;
+  local typeLookupRes::[Type] = lookup("Maybe", te.typeNameEnv);
+  te.type =
+    if null(typeLookupRes)
+    then error("Could not find Maybe type")
+    else head(typeLookupRes);
 }
 
 abstract production structureTypeExpr

@@ -73,9 +73,9 @@ d::Decl ::= 'type' n::Id_t '=' te::TypeExpr ';'
 }
 
 concrete production dataTypeDecl
-d::Decl ::= 'datatype' n::Id_t '=' te::TypeExpr ';'
+d::Decl ::= 'datatype' n::Id_t me::MaybeExtends '=' te::TypeExpr ';'
 {
-  d.ast = abs:dataTypeDecl(abs:name(n.lexeme, location=n.location), te.ast, location=d.location);
+  d.ast = abs:dataTypeDecl(abs:name(n.lexeme, location=n.location), te.ast, me.ast, location=d.location);
   d.ioOut = d.ioIn;
 }
 
@@ -93,18 +93,39 @@ d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::';'
   d.ioOut = d.ioIn;
 }
 
-closed nonterminal Params with ast<abs:Params>, location;
+synthesized attribute fieldAst::[Pair<String abs:TypeExpr>];
+closed nonterminal Params with ast<abs:Params>, fieldAst, pp, location;
 
 concrete productions p::Params
-| h::Id_t  mte::MaybeTypeExpr',' t::Params
+| h::Id_t mte::MaybeTypeExpr ',' t::Params
   {
     p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), mte.ast, t.ast);
+    p.fieldAst = pair(h.lexeme, mte.astOrAny) :: t.fieldAst;
+    p.pp = pp"${text(h.lexeme)}${mte.pp}, ${t.pp}";
   }
 | h::Id_t mte::MaybeTypeExpr
   {
     p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), mte.ast, abs:nilParam());
+    p.fieldAst = [pair(h.lexeme, mte.astOrAny)];
+    p.pp = cat(text(h.lexeme), mte.pp);
   }
 |
   {
     p.ast = abs:nilParam();
+    p.fieldAst = [];
+    p.pp = text("");
+  }
+
+closed nonterminal MaybeExtends with ast<Maybe<abs:TypeExpr>>, pp, location;
+
+concrete productions me::MaybeExtends
+| 'extends' n::Id_t
+  {
+    me.ast = just(abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=n.location));
+    me.pp = text(n.lexeme);
+  }
+|
+  {
+    me.ast = nothing();
+    me.pp = text("");
   }

@@ -2,72 +2,56 @@ grammar gia:concretesyntax;
 
 closed nonterminal TypeExpr with ast<abs:TypeExpr>, pp, location;
 
-concrete production anyTypeExpr
-te::TypeExpr ::= 'any'
-{
-  te.ast = abs:anyTypeExpr(location=te.location);
-  te.pp = text("any");
-}
-
-concrete production intTypeExpr
-te::TypeExpr ::= 'int'
-{
-  te.ast = abs:intTypeExpr(location=te.location);
-  te.pp = text("int");
-}
-
-concrete production strTypeExpr
-te::TypeExpr ::= 'str'
-{
-  te.ast = abs:strTypeExpr(location=te.location);
-  te.pp = text("str");
-}
-
-concrete production listTypeExpr
-te::TypeExpr ::= te1::TypeExpr '*'
-{
-  te.ast = abs:listTypeExpr(te1.ast, location=te.location);
-  te.pp = pp"${te1.pp}*";
-}
-
-concrete production structureTypeExpr
-te::TypeExpr ::= '{' fields::Fields '}'
-{
-  te.ast = abs:structureTypeExpr(fields.ast, location=te.location);
-  te.pp = pp"{${fields.pp}";
-}
-
-concrete production functionTypeExpr
-te::TypeExpr ::= '(' params::TypeExprs ')' '->' ret::TypeExpr
-{
-  te.ast = abs:functionTypeExpr(params.ast, ret.ast, location=te.location);
-  te.pp = pp"(${params.pp}) -> ${ret.pp}";
-}
-
-concrete production nameTypeExpr
-te::TypeExpr ::= n::Id_t
-{
-  te.ast = abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=te.location);
-  te.pp = text(n.lexeme);
-}
-
-closed nonterminal Fields with ast<[Pair<String abs:TypeExpr>]>, pp;
-
-concrete productions fs::Fields
-| n::Id_t ':' h::TypeExpr ',' t::Fields
+concrete productions te::TypeExpr
+| 'any'
   {
-    fs.ast = pair(n.lexeme, h.ast) :: t.ast;
-    fs.pp = concat([h.pp, text(","), t.pp]);
+    te.ast = abs:anyTypeExpr(location=te.location);
+    te.pp = text("any");
   }
-| n::Id_t ':' h::TypeExpr
+| 'bool'
   {
-    fs.ast = [pair(n.lexeme, h.ast)];
-    fs.pp = h.pp;
+    te.ast = abs:boolTypeExpr(location=te.location);
+    te.pp = text("bool");
   }
-|
+| 'int'
   {
-    fs.ast = [];
-    fs.pp = text("");
+    te.ast = abs:intTypeExpr(location=te.location);
+    te.pp = text("int");
+  }
+| 'str'
+  {
+    te.ast = abs:strTypeExpr(location=te.location);
+    te.pp = text("str");
+  }
+| te1::TypeExpr '*'
+  {
+    te.ast = abs:listTypeExpr(te1.ast, location=te.location);
+    te.pp = pp"${te1.pp}*";
+  }
+| te1::TypeExpr '?'
+  {
+    te.ast = abs:maybeTypeExpr(te1.ast, location=te.location);
+    te.pp = pp"${te1.pp}?";
+  }
+| '{' fields::Params '}'
+  {
+    te.ast = abs:structureTypeExpr(fields.fieldAst, location=te.location);
+    te.pp = pp"{${fields.pp}";
+  }
+| '(' params::TypeExprs ')' '->' ret::TypeExpr
+  {
+    te.ast = abs:functionTypeExpr(params.ast, ret.ast, location=te.location);
+    te.pp = pp"(${params.pp}) -> ${ret.pp}";
+  }
+| n::Id_t
+  {
+    te.ast = abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=te.location);
+    te.pp = text(n.lexeme);
+  }
+| '[' te1::TypeExpr ']'
+  {
+    te.ast = te1.ast;
+    te.pp = pp"(${te1.pp})";
   }
 
 closed nonterminal TypeExprs with ast<[abs:TypeExpr]>, pp;
@@ -89,16 +73,19 @@ concrete productions tes::TypeExprs
     tes.pp = text("");
   }
 
-closed nonterminal MaybeTypeExpr with ast<abs:MaybeTypeExpr>, pp, location;
+synthesized attribute astOrAny::abs:TypeExpr;
+closed nonterminal MaybeTypeExpr with ast<abs:MaybeTypeExpr>, astOrAny, pp, location;
 
 concrete productions mte::MaybeTypeExpr
 | ':' h::TypeExpr
   {
     mte.ast = abs:justTypeExpr(h.ast, location=h.location);
-    mte.pp = h.pp;
+    mte.astOrAny = h.ast;
+    mte.pp = cat(text(":"), h.pp);
   }
 |
   {
     mte.ast = abs:nothingTypeExpr(location=mte.location);
+    mte.astOrAny = abs:anyTypeExpr(location=mte.location);
     mte.pp = text("");
   }

@@ -1,21 +1,32 @@
 grammar gia:abstractsyntax:type;
 
-aspect production noneLiteral
-e::Expr ::= 
+aspect production valueExpr
+e::Expr ::= v::Value
 {
+  e.type = anyType(); --TODO?
+}
+
+aspect production errorExpr
+e::Expr ::= e1::Expr
+{
+  e.errors <-
+    case e1.type of
+      strType() -> []
+    | _ -> [err(e1.location, "Error expression must be a string literal")]
+    end;
   e.type = anyType();
 }
 
 aspect production trueLiteral
 e::Expr ::= 
 {
-  e.type = anyType();
+  e.type = boolType();
 }
 
-aspect production valueExpr
-e::Expr ::= v::Value
+aspect production falseLiteral
+e::Expr ::= 
 {
-  e.type = anyType(); --TODO
+  e.type = boolType();
 }
 
 aspect production intLiteral
@@ -33,7 +44,7 @@ e::Expr ::= s::String
 aspect production wildcardLiteral
 e::Expr ::= 
 {
-  e.type = error("Demanded type on wildcard");
+  e.type = anyType();
 }
 
 aspect production nameLiteral
@@ -45,7 +56,7 @@ e::Expr ::= n::Name
 aspect production capture
 e::Expr ::= e1::Expr
 {
-  e.type = error("Demanded type on capture");
+  e.type = e1.type;
 }
 
 aspect production app
@@ -56,10 +67,15 @@ e::Expr ::= f::Expr args::Exprs
       anyType() -> []
     | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
     end;
+  e.patternErrors <- 
+    case f.type of
+      anyType() -> []
+    | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
+    end;
   e.type =
     case f.type of
       anyType() -> anyType()
-    | functionType(_, ret) -> ret
+    | functionType(params, ret) -> ret
     end;
 }
 
@@ -76,7 +92,7 @@ function paramErrors
         [err(loc, s"Invalid type for parameter ${toString(index)} in function call (expected ${show(80, p.pp)}, got ${show(80, a.pp)})")]
       end ++ paramErrors(params, args, index + 1, loc)
     | _, _ ->
-      [err(loc, s"Incorrect number of parameter in function call (expected ${toString(index + length(params))}, got ${toString(index - 1)})")]
+      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index - 1)})")]
     end;
 }
 
@@ -118,34 +134,43 @@ aspect production eqOp
 e::Expr ::= e1::Expr e2::Expr
 {
   e.errors <- mergeTypesErrors(e1.type, e2.type, "==", e.location);
-  e.type = anyType();
+  e.type = boolType();
 }
 
 aspect production andOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "&", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  e.errors <-
+    convertTypeExpectedErrors(e1.type, boolType(), "&", e.location) ++
+    convertTypeExpectedErrors(e2.type, boolType(), "&", e.location);
+  e.type = boolType();
 }
 
 aspect production orOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "|", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  e.errors <- 
+    convertTypeExpectedErrors(e1.type, boolType(), "|", e.location) ++
+    convertTypeExpectedErrors(e2.type, boolType(), "|", e.location);
+  e.type = boolType();
 }
 
 aspect production notOp
 e::Expr ::= e1::Expr
 {
-  e.type = anyType();
+  e.errors <- convertTypeExpectedErrors(e1.type, boolType(), "!", e.location);
+  e.type = boolType();
 }
 
 aspect production matchOp
 e::Expr ::= e1::Expr e2::Expr
 {
   e.errors <- mergeTypesErrors(e1.type, e2.type, "~", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  local typeLookupRes::[Type] = lookup("Maybe", e.typeNameEnv);
+  e.type =
+    if null(typeLookupRes)
+    then error("Could not find Maybe type")
+    else head(typeLookupRes);
 }
 
 aspect production accessOp

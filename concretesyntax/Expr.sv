@@ -3,9 +3,9 @@ grammar gia:concretesyntax;
 closed nonterminal Expr with ast<abs:Expr>, pp, location;
 
 concrete productions e::Expr
-| 'none'
+| 'false'
   {
-    e.ast = abs:noneLiteral(location=e.location);
+    e.ast = abs:falseLiteral(location=e.location);
     e.pp = text("none");
   }
 | 'true'
@@ -122,6 +122,11 @@ concrete productions e::Expr
   {
     e.ast = e1.ast;
     e.pp = concat([text("("), e1.pp, text(")")]);
+  }
+| 'error' '(' e1::Expr ')'
+  {
+    e.ast = e1.ast;
+    e.pp = pp"error(${e1.pp})";
   }
 
 closed nonterminal Exprs with ast<abs:Exprs>, pp;

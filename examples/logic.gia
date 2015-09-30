@@ -39,7 +39,7 @@ Not(a : BoolExpr) : BoolExpr {
     else Not(a);
 }
 
-Var(a : BoolExpr) : BoolExpr {
+Var(a) : BoolExpr {
   isTrue = Var(a);
 }
 
@@ -49,10 +49,8 @@ isTrue(expr : BoolExpr) {
   matchNot = expr ~ Not(@_);
   matchVar = expr ~ Var(@_);
   return
-    if expr ~ True() |
-       matchAnd & isTrue(matchAnd[0]) & isTrue(matchAnd[1]) |
-       matchOr & (isTrue(matchOr[0]) | isTrue(matchOr[1])) |
-       matchNot & !isTrue(matchNot[0])
-    then true
-    else none;
+    (expr ~ True()).hasValue |
+    matchAnd.hasValue & isTrue(matchAnd.value[0]) & isTrue(matchAnd.value[1]) |
+    matchOr.hasValue & (isTrue(matchOr.value[0]) | isTrue(matchOr.value[1])) |
+    matchNot.hasValue & !isTrue(matchNot.value[0]);
 }

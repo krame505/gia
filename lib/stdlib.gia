@@ -1,0 +1,45 @@
+# gia standard util
+
+# Maybe
+datatype Maybe = {hasValue : bool, value};
+
+Some(x) : Maybe {
+  hasValue = true;
+  value = x;
+}
+
+None() : Maybe {
+  hasValue = false;
+  value = error("Demanded value from None");
+}
+
+# List
+null(l : any*) : bool {
+  return !(l ~ (_ :: _)).value;
+}
+
+head(l : any*) : any {
+  return l[0];
+}
+
+tail(l : any*) : any* {
+  return (l ~ (@_ :: _)).value[0];
+}
+
+# Util functions
+map(f : (any) -> any, items : any*) : any* {
+  return
+    if null(items)
+    then []
+    else f(head(items)) :: map(f, tail(items));
+}
+
+filter(f : (any) -> bool, items : any*) : any* {
+  rest = filter(f, tail(items));
+  return
+    if null(items)
+    then []
+    else if f(head(items))
+    then head(items) :: rest
+    else rest;
+}
