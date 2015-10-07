@@ -43,3 +43,12 @@ filter(f : (any) -> bool, items : any*) : any* {
     then head(items) :: rest
     else rest;
 }
+
+containsBy(f : (any, any) -> bool, x, items : any*) : bool {
+  return
+    if null(items)
+    then false
+    else if f(head(items), x)
+    then true
+    else containsBy(f, x, tail(items));
+}
