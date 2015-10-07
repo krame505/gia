@@ -85,7 +85,7 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::ValueEnv params::Params body::Body
+v::Value ::= name::String env::ValueEnv params::Params body::Decls
 {
   v.pp = pp"function ${text(name)}(${params.pp})";
   v.eq = opError("==", v, _, _);
@@ -104,6 +104,7 @@ v::Value ::= env::ValueEnv expr::Expr
 {
   expr.env = env;
   expr.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
+  expr.typeNameEnv = error("Value should not depend on typeNameEnv"); -- TODO: Find bad dependency
   forwards to expr.value;
 }
 

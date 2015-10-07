@@ -9,10 +9,10 @@ imports silver:langutil:pp with implode as ppImplode;
 type TypeEnv = Env<Type>;
 type TypeDef = Def<Type>;
 
-autocopy attribute typeEnv::TypeEnv occurs on Body, Equation, Decls, Decl, Params, Expr, Exprs, Name;
-synthesized attribute typeDefs::[TypeDef] occurs on Decls, Decl, Params, Body, Equation;
+autocopy attribute typeEnv::TypeEnv occurs on Decls, Decl, Params, Expr, Exprs, Name;
+synthesized attribute typeDefs::[TypeDef] occurs on Decls, Decl, Params;
 
-autocopy attribute typeNameEnv::TypeEnv occurs on Body, Equation, Decls, Decl, Params, Expr, Exprs, Name;
+autocopy attribute typeNameEnv::TypeEnv occurs on Decls, Decl, Params, Expr, Exprs, Name;
 synthesized attribute typeNameDefs::[TypeDef] occurs on Decls, Decl;
 
 nonterminal Type with pp;
@@ -85,6 +85,12 @@ t::Type ::= n::Name resolved::Type
 {
   t.pp = n.pp;
   forwards to resolved;
+}
+
+abstract production extendsType
+t::Type ::= n::Name t1::Type
+{
+  forwards to t1;
 }
 
 function mergeTypesErrors
@@ -175,6 +181,10 @@ Maybe<Type> ::= t1::Type t2::Type
           nothing() -> nothing()
         | just(f) -> just(structureType(f))
         end
+    | extendsType(n1, dataType(n2, f1)), dataType(n3, f2) -> 
+        if n1.name == n3.name || n2.name == n3.name
+        then just(dataType(n3, f1)) -- Data types with the same name must be identical
+        else nothing()
     | dataType(n1, f1), dataType(n2, f2) -> 
         if n1.name == n2.name
         then just(dataType(n1, f1)) -- Data types with the same name must be identical

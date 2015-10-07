@@ -41,6 +41,8 @@ terminal Lambda_t   'fn'       lexer classes {Keyword};
 terminal If_t       'if'       lexer classes {Keyword};
 terminal Then_t     'then'     lexer classes {Keyword};
 terminal Else_t     'else'     lexer classes {Keyword}, precedence = 0, association = left;
+terminal Let_t      'let'      lexer classes {Keyword};
+terminal In_t       'in'       lexer classes {Keyword}, precedence = 0, association = left;
 
 terminal Any_t     'any'     lexer classes {Keyword};
 terminal Bool_t    'bool'    lexer classes {Keyword};

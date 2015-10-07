@@ -61,8 +61,9 @@ te::TypeExpr ::= fields::[Pair<String TypeExpr>]
 abstract production functionTypeExpr
 te::TypeExpr ::= params::[TypeExpr] ret::TypeExpr
 {
-  te.errors := ret.errors ++ foldr(append, [], map((.errors), params));
-  te.type = functionType(map((.type), params), ret.type);
+  local paramTypeExprs::[Decorated TypeExpr] = map(decorateTypeExpr(te.typeNameEnv, te.typeEnv, _), params);
+  te.errors := ret.errors ++ foldr(append, [], map((.errors), paramTypeExprs));
+  te.type = functionType(map((.type), paramTypeExprs), ret.type);
 }
 
 abstract production nameTypeExpr

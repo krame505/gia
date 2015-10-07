@@ -128,6 +128,15 @@ concrete productions e::Expr
     e.ast = e1.ast;
     e.pp = pp"error(${e1.pp})";
   }
+| 'let' '{' ds::Decls '}' 'in' e1::Expr
+  {
+    e.ast = abs:letExpr(ds.ast, e1.ast, location=e.location);
+    e.pp = pp"let {<decls>} in el.pp"; --TODO
+    
+    ds.ioIn = error("Use decl in let"); --TODO
+    ds.currentDir = error("Use decl in let"); --TODO
+    ds.parse = error("Use decl in let"); --TODO
+  }
 
 closed nonterminal Exprs with ast<abs:Exprs>, pp;
 

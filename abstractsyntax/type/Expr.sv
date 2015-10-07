@@ -267,6 +267,15 @@ e::Expr ::= el::Exprs
   e.type = listType(foldr(mergeTypesOrAny, anyType(), el.types));
 }
 
+aspect production letExpr
+e::Expr ::= ds::Decls e1::Expr
+{
+  e1.typeEnv = addEnv(ds.typeDefs, e.typeEnv);
+  e1.typeNameEnv = addEnv(ds.typeNameDefs, e.typeNameEnv);
+  
+  e.type = e1.type;
+}
+
 synthesized attribute listTypeErrors::[Message] with ++;
 attribute listTypeErrors occurs on Exprs;
 synthesized attribute types::[Type] occurs on Exprs, Params;

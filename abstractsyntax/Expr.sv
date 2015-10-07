@@ -132,11 +132,12 @@ e::Expr ::= f::Expr args::Exprs
     end ++ args.patternErrors;
   e.pp = concat([f.pp, text("("), args.pp, text(")")]);
   
-  local body::Body =
+  local body::Decls =
     case f.value of
       val:functionValue(_, _, _, body) -> body
     end;
   body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
+  body.typeNameEnv = error("Value should not depend on typeNameEnv"); -- TODO: Find bad dependency
   body.env =
     case f.value of
       val:functionValue(n, env, _, _) -> 
@@ -188,7 +189,7 @@ e::Expr ::= params::Params body::Expr
   body.env = addEnv(params.defs, e.env);
   
   local id::String = toString(genInt());
-  e.value = val:functionValue(s"<lambda ${id}>", e.env, params, returnBody(body, location=body.location));
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, params, returnDecl(body));
 }
 
 abstract production addOp
@@ -362,10 +363,16 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
   e.pp = concat([text("if"), cnd.pp, text("then"), th.pp, text("else"), el.pp]);
   
   e.value =
-    case cnd.value of
-      val:trueValue() -> th.value
-    | val:falseValue() -> el.value
-    | _ -> errorValue([err(cnd.location, "Invalid type to conditional")])
+    case cnd.value, cnd.value.access(name("hasValue", location=bogusLocation), bogusLocation) of
+      val:trueValue(), _ -> th.value
+    | val:falseValue(), _ -> el.value
+    | val:intValue(0), _ -> el.value
+    | val:intValue(_), _ -> th.value
+    | val:listValue([]), _ -> el.value
+    | val:listValue(_), _ -> th.value
+    | _, trueValue() -> th.value
+    | _, falseValue() -> el.value
+    | _, _ -> errorValue([err(cnd.location, "Invalid type to conditional")])
     end;
 }
 
@@ -384,6 +391,18 @@ e::Expr ::= el::Exprs
     | v -> val:listValue([v])
     end;
   e.matchRes = el.matchRes;
+}
+
+abstract production letExpr
+e::Expr ::= ds::Decls e1::Expr
+{
+  e.errors := ds.errors ++ e1.errors;
+  e.patternErrors := [err(e.location, "Let cannot occur in pattern expression")];
+  e.pp = pp"let {<decls>} in el.pp";
+  
+  e1.env = addEnv(ds.defs, e.env);
+  
+  e.value = e1.value;
 }
 
 synthesized attribute values::[val:Value];

@@ -1,6 +1,10 @@
 grammar gia:abstractsyntax;
 
-nonterminal Decls with env, defs, errors, evalExpr, evalRes, evalResType, evalErrors;
+synthesized attribute rules::[Pair<String Expr>];
+synthesized attribute returnExpr::Maybe<Expr>;
+synthesized attribute returnValue::Maybe<Value>;
+
+nonterminal Decls with env, defs, errors, rules, returnExpr, returnValue, evalExpr, evalRes, evalResType, evalErrors;
 
 abstract production consDecl
 d::Decls ::= h::Decl t::Decls
@@ -8,6 +12,9 @@ d::Decls ::= h::Decl t::Decls
   d.errors := h.errors ++ t.errors;
   d.defs = h.defs ++ t.defs;
   t.env = addEnv(h.defs, d.env);
+  d.rules = h.rules ++ t.rules;
+  d.returnExpr = t.returnExpr;
+  d.returnValue = t.returnValue;
   d.evalRes = t.evalRes;
   d.evalResType = t.evalResType;
   d.evalErrors = t.evalErrors;
@@ -18,6 +25,9 @@ d::Decls ::=
 {
   d.errors := [];
   d.defs = [];
+  d.rules = [];
+  d.returnExpr = nothing();
+  d.returnValue = nothing();
   
   local evalExpr::Expr = d.evalExpr;
   evalExpr.env = d.env;
@@ -32,6 +42,16 @@ d::Decls ::=
   d.evalErrors = evalExpr.errors;
 }
 
+abstract production returnDecl
+d::Decls ::= e::Expr
+{
+  d.errors := e.errors;
+  d.returnExpr = just(e);
+  d.returnValue = just(e.value);
+  
+  forwards to nilDecl();
+}
+
 abstract production parseErrorDecls
 d::Decls ::= errorTxt::String
 {
@@ -44,13 +64,14 @@ d::Decls ::= errorTxt::String
   forwards to nilDecl();
 }
 
-nonterminal Decl with env, defs, errors, location;
+nonterminal Decl with env, defs, rules, errors, location;
 
 abstract production decls
 d::Decl ::= ds::Decls
 {
   d.errors := ds.errors;
   d.defs = ds.defs;
+  d.rules = ds.rules;
 }
 
 abstract production typeDecl
@@ -58,10 +79,11 @@ d::Decl ::= n::Name te::TypeExpr
 {
   d.errors := te.errors;
   d.defs = [];
+  d.rules = [];
 }
 
 abstract production dataTypeDecl
-d::Decl ::= n::Name te::TypeExpr extends::Maybe<TypeExpr>
+d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
 {
   d.errors :=
     case te.type of
@@ -69,6 +91,7 @@ d::Decl ::= n::Name te::TypeExpr extends::Maybe<TypeExpr>
     | t -> [err(te.location, s"Type in datatype declaration must be a structure, but got ${show(80, t.pp)}")]
     end ++ te.errors;
   d.defs = [];
+  d.rules = [];
 }
 
 abstract production valDecl
@@ -76,13 +99,19 @@ d::Decl ::= n::Name e::Expr
 {
   d.errors := e.errors;
   d.defs = [pair(n.name, val:lazyValue(d.env, e))];
+  d.rules = [pair(n.name, e)];
 }
 
 abstract production nodeDecl
-d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Body
+d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
 {
   d.errors := p.errors ++ mte.errors ++ b.errors;
   d.defs = [pair(n.name, val:functionValue(n.name, d.env, p, b))];
+  d.rules =
+    case b.returnExpr of
+      just(e) -> [pair(n.name, lambdaExpr(p, letExpr(b, e, location=d.location), location=d.location))]
+    | nothing() -> []
+    end;
   
   -- Dummy values provided for error checking
   p.args = [];

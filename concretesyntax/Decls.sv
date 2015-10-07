@@ -11,6 +11,13 @@ d::Decls ::= h::Decl t::Decls
   d.ioOut = t.ioOut;
 }
 
+concrete production returnDecl
+d::Decls ::= 'return' e::Expr ';'
+{
+  d.ast = abs:returnDecl(e.ast);
+  d.ioOut = d.ioIn;
+}
+
 concrete production nilDecl
 d::Decls ::= 
 {
@@ -80,16 +87,20 @@ d::Decl ::= 'datatype' n::Id_t me::MaybeExtends '=' te::TypeExpr ';'
 }
 
 concrete production nodeDecl
-d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr '{' b::Body '}'
+d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr '{' b::Decls '}'
 {
   d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, b.ast, location=d.location);
   d.ioOut = d.ioIn;
+    
+  b.ioIn = error("Use decl in body"); --TODO
+  b.currentDir = error("Use decl in body"); --TODO
+  b.parse = error("Use decl in body"); --TODO
 }
 
 concrete production nodeDeclNoBody
 d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::';'
 {
-  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, abs:nilBody(location=b.location), location=d.location);
+  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, abs:nilDecl(), location=d.location);
   d.ioOut = d.ioIn;
 }
 
@@ -116,16 +127,16 @@ concrete productions p::Params
     p.pp = text("");
   }
 
-closed nonterminal MaybeExtends with ast<Maybe<abs:TypeExpr>>, pp, location;
+closed nonterminal MaybeExtends with ast<abs:TypeExpr>, pp, location;
 
 concrete productions me::MaybeExtends
 | 'extends' n::Id_t
   {
-    me.ast = just(abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=n.location));
+    me.ast = abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=n.location);
     me.pp = text(n.lexeme);
   }
 |
   {
-    me.ast = nothing();
+    me.ast = abs:anyTypeExpr(location=me.location);
     me.pp = text("");
   }
