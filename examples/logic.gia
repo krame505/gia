@@ -1,14 +1,22 @@
-datatype BoolExpr = {isTrue : BoolExpr};
+datatype BoolExpr = {isTrue: BoolExpr, and: (any) -> BoolExpr, or: (any) -> BoolExpr, not: BoolExpr, cond: bool}; # TODO: Fix bug with parameter type names missing
 
-True() : BoolExpr {
+True(): BoolExpr {
   isTrue = True();
+  and = fn(b) (b);
+  or = fn(b) (True());
+  not = False();
+  cond = true;
 }
 
-False() : BoolExpr {
+False(): BoolExpr {
   isTrue = False();
+  and = fn(b) (False());
+  or = fn(b) (b);
+  not = True();
+  cond = false;
 }
 
-And(a : BoolExpr, b : BoolExpr) : BoolExpr {
+And(a: BoolExpr, b: BoolExpr): BoolExpr {
   isTrue =
     if a == b
     then a
@@ -16,10 +24,18 @@ And(a : BoolExpr, b : BoolExpr) : BoolExpr {
     then b.isTrue
     else if b.isTrue == True()
     then a.isTrue
+    else if a.isTrue == False()
+    then False()
+    else if b.isTrue == False()
+    then False()
     else And(a.isTrue, b.isTrue);
+  and = fn(b) (And(b, isTrue).isTrue);
+  or = fn(b) (Or(b, isTrue).isTrue);
+  not = Not(isTrue).isTrue;
+  cond = a.cond & b.cond;
 }
 
-Or(a : BoolExpr, b : BoolExpr) : BoolExpr {
+Or(a: BoolExpr, b: BoolExpr): BoolExpr {
   isTrue =
     if a == b
     then a
@@ -27,23 +43,39 @@ Or(a : BoolExpr, b : BoolExpr) : BoolExpr {
     then True()
     else if b.isTrue == True()
     then True()
+    else if a.isTrue == False()
+    then b.isTrue
+    else if b.isTrue == False()
+    then a.isTrue
     else Or(a.isTrue, b.isTrue);
+  and = fn(b) (And(b, isTrue).isTrue);
+  or = fn(b) (Or(b, isTrue).isTrue);
+  not = Not(isTrue).isTrue;
+  cond = a.cond | b.cond;
 }
 
-Not(a : BoolExpr) : BoolExpr {
+Not(a: BoolExpr): BoolExpr {
   isTrue =
     if a.isTrue == True()
     then False()
     else if a.isTrue == False()
     then True()
     else Not(a);
+  and = fn(b) (And(b, isTrue).isTrue);
+  or = fn(b) (Or(b, isTrue).isTrue);
+  not = Not(isTrue).isTrue;
+  cond = !a.cond;
 }
 
-Var(a) : BoolExpr {
+Var(a): BoolExpr {
   isTrue = Var(a);
+  and = fn(b) (And(b, isTrue).isTrue);
+  or = fn(b) (Or(b, isTrue).isTrue);
+  not = Not(isTrue).isTrue;
+  cond = error("Condition on Var");
 }
 
-isTrue(expr : BoolExpr) {
+isTrue(expr: BoolExpr) {
   matchAnd = expr ~ And(@_, @_);
   matchOr = expr ~ Or(@_, @_);
   matchNot = expr ~ Not(@_);
@@ -54,3 +86,6 @@ isTrue(expr : BoolExpr) {
     matchOr.hasValue & (isTrue(matchOr.value[0]) | isTrue(matchOr.value[1])) |
     matchNot.hasValue & !isTrue(matchNot.value[0]);
 }
+
+test1 = And(Or(Not(Var("x")), False()), True());
+test2 = And(Or(Not(Var("x")), Var("x")), True());

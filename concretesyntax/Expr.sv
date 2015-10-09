@@ -110,13 +110,18 @@ concrete productions e::Expr
   }
 | e1::Expr LALBracket_t e2::Expr ']'
   {
-    e.ast = abs:listIndex(e1.ast, e2.ast, location=e.location);
+    e.ast = abs:index(e1.ast, e2.ast, location=e.location);
     e.pp = concat([e1.pp, text("["), e2.pp, text("]")]);
   }
 | '[' el::Exprs ']'
   {
     e.ast = abs:constructList(el.ast, location=e.location);
     e.pp = concat([text("["), el.pp, text("]")]);
+  }
+| '{' el::Exprs '}'
+  {
+    e.ast = abs:constructSet(el.ast, location=e.location);
+    e.pp = concat([text("{"), el.pp, text("}")]);
   }
 | '(' e1::Expr ')'
   {
@@ -125,7 +130,7 @@ concrete productions e::Expr
   }
 | 'error' '(' e1::Expr ')'
   {
-    e.ast = e1.ast;
+    e.ast = abs:errorExpr(e1.ast, location=e.location);
     e.pp = pp"error(${e1.pp})";
   }
 | 'let' '{' ds::Decls '}' 'in' e1::Expr

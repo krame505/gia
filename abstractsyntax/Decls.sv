@@ -11,6 +11,7 @@ d::Decls ::= h::Decl t::Decls
 {
   d.errors := h.errors ++ t.errors;
   d.defs = h.defs ++ t.defs;
+  h.env = addEnv(d.defs, d.env);
   t.env = addEnv(h.defs, d.env);
   d.rules = h.rules ++ t.rules;
   d.returnExpr = t.returnExpr;
@@ -115,7 +116,7 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
   
   -- Dummy values provided for error checking
   p.args = [];
-  b.env = addEnv(p.defs ++ d.defs, d.env);
+  b.env = addEnv(p.defs, d.env);
 }
 
 inherited attribute args::[val:Value];

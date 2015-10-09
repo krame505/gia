@@ -8,6 +8,7 @@ d::Decls ::= h::Decl t::Decls
 {
   d.typeDefs = h.typeDefs ++ t.typeDefs;
   d.typeNameDefs = h.typeNameDefs ++ t.typeNameDefs;
+  --h.typeEnv = addEnv(d.typeDefs, d.typeEnv);
   t.typeEnv = addEnv(h.typeDefs, d.typeEnv);
   t.typeNameEnv = addEnv(h.typeNameDefs, d.typeNameEnv);
   d.ruleTypes = h.ruleTypes ++ t.ruleTypes;

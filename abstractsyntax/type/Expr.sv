@@ -102,6 +102,7 @@ e::Expr ::= params::Params body::Expr
   e.type = functionType(params.types, body.type);
 }
 
+-- TODO: Type check overloaded ops properly
 aspect production addOp
 e::Expr ::= e1::Expr e2::Expr
 {
@@ -130,6 +131,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.type = mergeTypesOrAny(e1.type, e2.type);
 }
 
+-- TODO: Type check overload is boolean
 aspect production eqOp
 e::Expr ::= e1::Expr e2::Expr
 {
@@ -140,26 +142,26 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production andOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <-
-    convertTypeExpectedErrors(e1.type, boolType(), "&", e.location) ++
-    convertTypeExpectedErrors(e2.type, boolType(), "&", e.location);
-  e.type = boolType();
+  e.errors <- mergeTypesErrors(e1.type, e2.type, "&", e.location);
+    --convertTypeExpectedErrors(e1.type, boolType(), "&", e.location) ++
+    --convertTypeExpectedErrors(e2.type, boolType(), "&", e.location);
+  e.type = mergeTypesOrAny(e1.type, e2.type);--boolType();
 }
 
 aspect production orOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- 
-    convertTypeExpectedErrors(e1.type, boolType(), "|", e.location) ++
-    convertTypeExpectedErrors(e2.type, boolType(), "|", e.location);
-  e.type = boolType();
+  e.errors <- mergeTypesErrors(e1.type, e2.type, "|", e.location);
+    --convertTypeExpectedErrors(e1.type, boolType(), "|", e.location) ++
+    --convertTypeExpectedErrors(e2.type, boolType(), "|", e.location);
+  e.type = mergeTypesOrAny(e1.type, e2.type);--boolType();
 }
 
 aspect production notOp
 e::Expr ::= e1::Expr
 {
-  e.errors <- convertTypeExpectedErrors(e1.type, boolType(), "!", e.location);
-  e.type = boolType();
+  --e.errors <- convertTypeExpectedErrors(e1.type, boolType(), "!", e.location);
+  e.type = e1.type;--boolType();
 }
 
 aspect production matchOp
@@ -225,7 +227,7 @@ e::Expr ::= h::Expr t::Expr
     end;
 }
 
-aspect production listIndex
+aspect production index
 e::Expr ::= e1::Expr e2::Expr
 {
   e.errors <-
@@ -267,6 +269,13 @@ e::Expr ::= el::Exprs
   e.type = listType(foldr(mergeTypesOrAny, anyType(), el.types));
 }
 
+aspect production constructSet
+e::Expr ::= el::Exprs
+{
+  e.errors <- el.listTypeErrors;
+  e.type = listType(foldr(mergeTypesOrAny, anyType(), el.types));
+}
+
 aspect production letExpr
 e::Expr ::= ds::Decls e1::Expr
 {
@@ -277,7 +286,9 @@ e::Expr ::= ds::Decls e1::Expr
 }
 
 synthesized attribute listTypeErrors::[Message] with ++;
+synthesized attribute setTypeErrors::[Message] with ++;
 attribute listTypeErrors occurs on Exprs;
+attribute setTypeErrors occurs on Exprs;
 synthesized attribute types::[Type] occurs on Exprs, Params;
 
 aspect production consExpr
@@ -287,6 +298,10 @@ e::Exprs ::= h::Expr t::Exprs
     if null(t.types)
     then []
     else mergeTypesErrors(h.type, head(t.types), "list construction", h.location) ++ t.listTypeErrors;
+  e.setTypeErrors :=
+    if null(t.types)
+    then []
+    else mergeTypesErrors(h.type, head(t.types), "set construction", h.location) ++ t.setTypeErrors;
   e.types = h.type :: t.types;
 }
 
@@ -294,5 +309,6 @@ aspect production nilExpr
 e::Exprs ::= 
 {
   e.listTypeErrors := [];
+  e.setTypeErrors := [];
   e.types = [];
 }

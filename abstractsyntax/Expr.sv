@@ -267,12 +267,7 @@ e::Expr ::= e1::Expr
   e.errors := e1.errors;
   e.patternErrors := e1.patternErrors;
   e.pp = cat(text("!"), e1.pp);
-  e.value =
-    case e1.value of
-      val:falseValue() -> val:trueValue()
-    | val:trueValue() -> val:falseValue()
-    | _ -> errorValue([err(e1.location, "Invalid type to not")])
-    end;
+  e.value = e1.value.not(e.location);
   e1.matchValue = e.matchValue;
   e.matchRes = 
     case e1.matchValue.access(name("hasValue", location=bogusLocation), bogusLocation) of
@@ -339,7 +334,7 @@ e::Expr ::= h::Expr t::Expr
     end;
 }
 
-abstract production listIndex
+abstract production index
 e::Expr ::= e1::Expr e2::Expr
 {
   e.errors := e1.errors ++ e2.errors;
@@ -350,8 +345,7 @@ e::Expr ::= e1::Expr e2::Expr
     case e1.value, e2.value of
       errorValue(_), _ -> e1.value
     | _, errorValue(_) -> e2.value
-    | val:listValue(vs), val:intValue(i) -> head(drop(i, vs))
-    | _, _ -> val:opError("List index", e1.value, e2.value, e.location)
+    | v1, v2 -> v1.index(v2, e.location)
     end;
 }
 
@@ -363,16 +357,14 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
   e.pp = concat([text("if"), cnd.pp, text("then"), th.pp, text("else"), el.pp]);
   
   e.value =
-    case cnd.value, cnd.value.access(name("hasValue", location=bogusLocation), bogusLocation) of
-      val:trueValue(), _ -> th.value
-    | val:falseValue(), _ -> el.value
-    | val:intValue(0), _ -> el.value
-    | val:intValue(_), _ -> th.value
-    | val:listValue([]), _ -> el.value
-    | val:listValue(_), _ -> th.value
-    | _, trueValue() -> th.value
-    | _, falseValue() -> el.value
-    | _, _ -> errorValue([err(cnd.location, "Invalid type to conditional")])
+    case cnd.value of
+      errorValue(_) -> cnd.value
+    | v ->
+      case v.cond(e.location) of
+        val:trueValue() -> th.value
+      | val:falseValue() -> el.value
+      | v -> v
+      end
     end;
 }
 
@@ -391,6 +383,16 @@ e::Expr ::= el::Exprs
     | v -> val:listValue([v])
     end;
   e.matchRes = el.matchRes;
+}
+
+abstract production constructSet
+e::Expr ::= el::Exprs
+{
+  e.errors := el.errors;
+  e.patternErrors := [err(e.location, "Matching on sets is not yet implimented")];
+  e.pp = concat([text("{"), el.pp, text("}")]);
+  
+  e.value = val:setValue(nubBy(val:eqValue, el.values));
 }
 
 abstract production letExpr

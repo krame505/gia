@@ -5,6 +5,7 @@ imports gia:abstractsyntax:env;
 
 imports silver:langutil hiding pp;
 imports silver:langutil:pp with implode as ppImplode;
+imports silver:util:raw:treeset as ts;
 
 type ValueEnv = Env<Value>;
 type ValueDef = Def<Value>;
@@ -12,6 +13,7 @@ type ValueDef = Def<Value>;
 autocopy attribute env::ValueEnv;
 synthesized attribute defs::[ValueDef];
 
+synthesized attribute index::(Value ::= Value Location);
 synthesized attribute add::(Value ::= Value Location);
 synthesized attribute sub::(Value ::= Value Location);
 synthesized attribute mul::(Value ::= Value Location);
@@ -20,20 +22,26 @@ synthesized attribute eq::(Value ::= Value Location);
 synthesized attribute gt::(Value ::= Value Location);
 synthesized attribute and::(Value ::= Value Location);
 synthesized attribute or::(Value ::= Value Location);
+synthesized attribute not::(Value ::= Location);
+synthesized attribute cond::(Value ::= Location);
 synthesized attribute access::(Value ::= Name Location);
 
-nonterminal Value with pp, add, sub, mul, div, eq, gt, and, or, access;
+nonterminal Value with pp, index, add, sub, mul, div, eq, gt, and, or, not, cond, access;
 
 aspect default production
 v::Value ::= 
 {
+  v.index = opError("[]", v, _, _);
   v.add = opError("+", v, _, _);
   v.sub = opError("-", v, _, _);
   v.mul = opError("*", v, _, _);
   v.div = opError("/", v, _, _);
+  v.eq = opError("==", v, _, _);
   v.gt = opError(">", v, _, _);
   v.and = opError("&", v, _, _);
   v.or = opError("|", v, _, _);
+  v.not = unaryOpError("!", v, _);
+  v.cond = unaryOpError("if", v, _);
   v.access = nameOpError(".", v, _, _);
 }
 
@@ -43,7 +51,9 @@ v::Value ::=
   v.pp = text("true");
   v.eq = eqTrue(_, _);
   v.and = and(v, _, _);
-  v.or = identity(v, _, _);
+  v.or = binaryIdentity(v, _, _);
+  v.not = unaryIdentity(falseValue(), _);
+  v.cond = unaryIdentity(v, _);
 }
 
 abstract production falseValue
@@ -51,8 +61,10 @@ v::Value ::=
 {
   v.pp = text("false");
   v.eq = eqFalse(_, _);
-  v.and = identity(v, _, _);
-  v.or = identity(_, v, _);
+  v.and = binaryIdentity(v, _, _);
+  v.or = binaryIdentity(_, v, _);
+  v.not = unaryIdentity(trueValue(), _);
+  v.cond = unaryIdentity(v, _);
 }
 
 abstract production intValue
@@ -65,6 +77,7 @@ v::Value ::= i::Integer
   v.div = divInt(i, _, _);
   v.eq = eqInt(i, _, _);
   v.gt = gtInt(i, _, _);
+  v.cond = unaryIdentity(if i == 0 then falseValue() else trueValue(), _);
 }
 
 abstract production strValue
@@ -80,8 +93,23 @@ abstract production listValue
 v::Value ::= contents::[Value]
 {
   v.pp = pp"[${ppImplode(text(", "), map((.pp), contents))}]";
+  v.index = indexList(contents, _, _);
   v.add = catList(contents, _, _);
   v.eq = eqList(contents, _, _);
+  v.cond = unaryIdentity(if null(contents) then falseValue() else trueValue(), _);
+}
+
+-- TODO: Impliment more efficiently
+abstract production setValue
+v::Value ::= contents::[Value]
+{
+  v.pp = pp"{${ppImplode(text(", "), map((.pp), contents))}}";
+  v.add = intersectSet(contents, _, _);
+  v.sub = removeSet(contents, _, _);
+  v.and = intersectSet(contents, _, _);
+  v.or = unionSet(contents, _, _);
+  v.eq = eqSet(contents, _, _);
+  v.cond = unaryIdentity(if null(contents) then falseValue() else trueValue(), _);
 }
 
 abstract production functionValue
@@ -96,7 +124,16 @@ v::Value ::= name::String children::[Value] bindings::[Pair<String Value>]
 {
   v.pp = pp"${text(name)}(${ppImplode(text(", "), map((.pp), children))})";
   v.access = access(bindings, _, _);
-  v.eq = eqNode(name, children, _, _);
+  v.eq = eqNode(name, children, bindings, _, _);
+  v.add = nodeOp("add", bindings, _, _);
+  v.sub = nodeOp("sub", bindings, _, _);
+  v.mul = nodeOp("mul", bindings, _, _);
+  v.div = nodeOp("div", bindings, _, _);
+  v.gt = nodeOp("gt", bindings, _, _);
+  v.and = nodeOp("and", bindings, _, _);
+  v.or = nodeOp("or", bindings, _, _);
+  v.not = unaryNodeOp("not", bindings, _);
+  v.cond = unaryNodeOp("cond", bindings, _);
 }
 
 abstract production lazyValue
@@ -112,10 +149,16 @@ abstract production errorValue
 v::Value ::= msgs::[Message]
 {
   v.pp = text(implode("\n", map((.message), msgs)));
-  v.eq = identity(v, _, _);
+  v.eq = binaryIdentity(v, _, _);
 }
 
-function identity
+function unaryIdentity
+Value ::= v::Value loc::Location
+{
+  return v;
+}
+
+function binaryIdentity
 Value ::= v1::Value v2::Value loc::Location
 {
   return v1;
@@ -250,13 +293,23 @@ Value ::= s::String v::Value loc::Location
     end;
 }
 
+function indexList
+Value ::= l::[Value] v::Value loc::Location
+{
+  return
+    case v of
+      intValue(i) -> head(drop(i, l))
+    | _ -> opError("[]", listValue(l), v, loc)
+    end;
+}
+
 function catList
 Value ::= l::[Value] v::Value loc::Location
 {
   return
-    case l, v of
-      _, listValue(m) -> listValue(l ++ m)
-    | _, _ -> opError("+", listValue(l), v, loc)
+    case v of
+      listValue(m) -> listValue(l ++ m)
+    | _ -> opError("+", listValue(l), v, loc)
     end;
 }
 
@@ -286,6 +339,67 @@ Value ::= l::[Value] v::Value loc::Location
     end;
 }
 
+function indexSet
+Value ::= s::[Value] v::Value loc::Location
+{
+  local lookup::[Value] = filter(eqValue(v, _), s);
+  return
+    if null(lookup)
+    then constructNone()
+    else constructSome(head(lookup));
+}
+
+function intersectSet
+Value ::= s::[Value] v::Value loc::Location
+{
+  return
+    case v of
+      setValue(s1) -> setValue(intersectBy(eqValue, s, s1))
+    | _ -> opError("|", setValue(s), v, loc)
+    end;
+}
+
+function unionSet
+Value ::= s::[Value] v::Value loc::Location
+{
+  return
+    case v of
+      setValue(s1) -> setValue(unionBy(eqValue, s, s1))
+    | _ -> opError("&", setValue(s), v, loc)
+    end;
+}
+
+function removeSet
+Value ::= s::[Value] v::Value loc::Location
+{
+  return
+    case v of
+      setValue(s1) -> setValue(removeAllBy(eqValue, s, s1))
+    | _ -> opError("-", setValue(s), v, loc)
+    end;
+}
+
+function eqSet
+Value ::= s::[Value] v::Value loc::Location
+{
+  return
+    case v of
+      setValue(s1) ->
+        if foldr(andHelper, true, map(containsBy(eqValue, _, s), s1)) &&
+           foldr(andHelper, true, map(containsBy(eqValue, _, s1), s))
+        then trueValue()
+        else falseValue()
+    | _ -> opError("==", setValue(s), v, loc)
+    end;
+}
+
+-- Seems like something like this should be built-in
+function andHelper
+Boolean ::= b1::Boolean b2::Boolean
+{
+  return b1 && b2;
+}
+
 function access
 Value ::= bindings::[Pair<String Value>] field::Name loc::Location
 {
@@ -299,13 +413,41 @@ Value ::= bindings::[Pair<String Value>] field::Name loc::Location
     end;
 }
 
-function eqNode
-Value ::= n::String l::[Value] v::Value loc::Location
+function nodeOp
+Value ::= op::String bindings::[Pair<String Value>] v::Value loc::Location
 {
+  local lookup::Value = access(bindings, name(op, location=bogusLocation), loc);
+  local res::Expr = 
+    app(
+      valueExpr(lookup, location=bogusLocation),
+      consExpr(valueExpr(v, location=bogusLocation), nilExpr()),
+      location=bogusLocation);
+  res.env = emptyEnv();
+  res.typeEnv = error("Value shouldn't depend on typeEnv");
+  res.typeNameEnv = error("Value shouldn't depend on typeNameEnv");
   return
-    case v of
-      nodeValue(n1, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else falseValue()
-    | _ -> opError("==", nodeValue(n, l, []), v, loc)
+    case v, lookup of
+      errorValue(_), _ -> v
+    | _, functionValue(_, _, _, _) -> res.value
+    | _, _ -> lookup -- TODO: Better error message
+    end;
+}
+
+function unaryNodeOp
+Value ::= op::String bindings::[Pair<String Value>] loc::Location
+{
+  return access(bindings, name(op, location=bogusLocation), loc);
+}
+
+function eqNode
+Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Location
+{
+  local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
+  return
+    case lookup, v of
+      functionValue(_, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+    | _, nodeValue(n1, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else falseValue()
+    | _, _ -> opError("==", nodeValue(n, l, []), v, loc)
     end;
 }
 
@@ -330,15 +472,51 @@ Value ::= op::String v1::Value v2::Value loc::Location
     end;
 }
 
+function unaryOpError
+Value ::= op::String v::Value loc::Location
+{
+  return
+    case v of
+      errorValue(_) -> v
+    | _ -> errorValue([err(loc, s"${op} undefined for ${show(80, v.pp)}")])
+    end;
+}
+
 -- Util
 function constructSome
 Value ::= v::Value
 {
-  return nodeValue("Some", [v], [pair("hasValue", trueValue()), pair("value", v)]);
+  return
+    nodeValue(
+      "Some",
+      [v],
+      [pair("hasValue", trueValue()),
+       pair("value", v)]);
 }
 
 function constructNone
 Value ::= 
 {
-  return nodeValue("None", [], [pair("hasValue", falseValue()), pair("value", errorValue([err(bogusLocation, "Demanded value from None")]))]);
+  return
+    nodeValue(
+      "None",
+      [],
+      [pair("hasValue", falseValue()),
+       pair("value", errorValue([err(bogusLocation, "Demanded value from None")]))]);
+}
+
+function eqValue
+Boolean ::= v1::Value v2::Value
+{
+  return
+    case v1.eq(v2, bogusLocation) of
+      trueValue() -> true
+    | _ -> false
+    end;
+}
+
+function emptySet
+Value ::= 
+{
+  return setValue([]);
 }
