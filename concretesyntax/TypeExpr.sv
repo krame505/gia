@@ -28,6 +28,11 @@ concrete productions te::TypeExpr
     te.ast = abs:listTypeExpr(te1.ast, location=te.location);
     te.pp = pp"${te1.pp}*";
   }
+| te1::TypeExpr '%'
+  {
+    te.ast = abs:setTypeExpr(te1.ast, location=te.location);
+    te.pp = pp"${te1.pp}*";
+  }
 | te1::TypeExpr '?'
   {
     te.ast = abs:maybeTypeExpr(te1.ast, location=te.location);

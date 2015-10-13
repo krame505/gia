@@ -3,7 +3,7 @@ grammar gia:abstractsyntax:type;
 aspect production valueExpr
 e::Expr ::= v::Value
 {
-  e.type = anyType(); --TODO?
+  e.type = v.type;
 }
 
 aspect production errorExpr
@@ -106,28 +106,28 @@ e::Expr ::= params::Params body::Expr
 aspect production addOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "+", e.location);
+  --e.errors <- mergeTypesErrors(e1.type, e2.type, "+", e.location);
   e.type = mergeTypesOrAny(e1.type, e2.type);
 }
 
 aspect production subOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "-", e.location);
+  --e.errors <- mergeTypesErrors(e1.type, e2.type, "-", e.location);
   e.type = mergeTypesOrAny(e1.type, e2.type);
 }
 
 aspect production mulOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "*", e.location);
+  --e.errors <- mergeTypesErrors(e1.type, e2.type, "*", e.location);
   e.type = mergeTypesOrAny(e1.type, e2.type);
 }
 
 aspect production divOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "/", e.location);
+  --e.errors <- mergeTypesErrors(e1.type, e2.type, "/", e.location);
   e.type = mergeTypesOrAny(e1.type, e2.type);
 }
 
@@ -135,14 +135,14 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production eqOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "==", e.location);
+  --e.errors <- mergeTypesErrors(e1.type, e2.type, "==", e.location);
   e.type = boolType();
 }
 
 aspect production andOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "&", e.location);
+  --e.errors <- mergeTypesErrors(e1.type, e2.type, "&", e.location);
     --convertTypeExpectedErrors(e1.type, boolType(), "&", e.location) ++
     --convertTypeExpectedErrors(e2.type, boolType(), "&", e.location);
   e.type = mergeTypesOrAny(e1.type, e2.type);--boolType();
@@ -230,7 +230,7 @@ e::Expr ::= h::Expr t::Expr
 aspect production index
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <-
+  {-e.errors <-
     case convertType(e2.type, intType()) of
       just(_) -> []
     | nothing() -> [err(e1.location, s"Index in list access must be an int (got ${show(80, e2.type.pp)})")]
@@ -239,10 +239,11 @@ e::Expr ::= e1::Expr e2::Expr
       anyType() -> []
     | listType(_) -> []
     | _ ->[err(e1.location, s"Expression in list access must be an list (got ${show(80, e1.type.pp)})")]
-    end;
+    end;-}
   e.type =
     case e2.type of
-     listType(t) -> t
+      listType(t) -> t
+    | setType(t) -> t
     | _ -> anyType()
     end;
 }
@@ -272,8 +273,8 @@ e::Expr ::= el::Exprs
 aspect production constructSet
 e::Expr ::= el::Exprs
 {
-  e.errors <- el.listTypeErrors;
-  e.type = listType(foldr(mergeTypesOrAny, anyType(), el.types));
+  e.errors <- el.setTypeErrors;
+  e.type = setType(foldr(mergeTypesOrAny, anyType(), el.types));
 }
 
 aspect production letExpr

@@ -107,7 +107,7 @@ abstract production nodeDecl
 d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
 {
   d.errors := p.errors ++ mte.errors ++ b.errors;
-  d.defs = [pair(n.name, val:functionValue(n.name, d.env, p, b))];
+  d.defs = [pair(n.name, val:functionValue(n.name, d.env, p.types, if b.returnType.isJust then b.returnType.fromJust else anyType(), p.names, b))];
   d.rules =
     case b.returnExpr of
       just(e) -> [pair(n.name, lambdaExpr(p, letExpr(b, e, location=d.location), location=d.location))]
@@ -116,11 +116,12 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
   
   -- Dummy values provided for error checking
   p.args = [];
-  b.env = addEnv(p.defs, d.env);
+  b.env = addEnv(p.defs ++ [pair("self", falseValue())], d.env);
 }
 
 inherited attribute args::[val:Value];
-nonterminal Params with env, defs, errors, pp, args, len;
+synthesized attribute names::[String];
+nonterminal Params with env, defs, names, errors, pp, args, len;
 
 abstract production consParam
 p::Params ::= h::Name mte::MaybeTypeExpr t::Params
@@ -135,6 +136,7 @@ p::Params ::= h::Name mte::MaybeTypeExpr t::Params
   local callValue::val:Value = if null(p.args) then val:falseValue() else head(p.args);
   t.args = if null(p.args) then [] else tail(p.args);
   p.defs = pair(h.name, callValue) :: t.defs;
+  p.names = h.name :: t.names;
   p.len = t.len + 1;
 }
 
@@ -144,5 +146,6 @@ p::Params ::=
   p.errors := [];
   p.pp = text("");
   p.defs = [];
+  p.names = [];
   p.len = 0;
 }

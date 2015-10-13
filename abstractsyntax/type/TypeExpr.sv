@@ -39,6 +39,13 @@ te::TypeExpr ::= te1::TypeExpr
   te.type = listType(te1.type);
 }
 
+abstract production setTypeExpr
+te::TypeExpr ::= te1::TypeExpr
+{
+  te.errors := te1.errors;
+  te.type = setType(te1.type);
+}
+
 abstract production maybeTypeExpr
 te::TypeExpr ::= te1::TypeExpr
 {

@@ -51,6 +51,16 @@ t::Type ::= t1::Type
     end;
 }
 
+abstract production setType
+t::Type ::= t1::Type
+{
+  t.pp =
+    case t1 of
+      functionType(_, _) -> pp"[${t1.pp}]%"
+    | _ -> pp"${t1.pp}%"
+    end;
+}
+
 abstract production structureType
 t::Type ::= fields::[Pair<String Type>]
 {
@@ -166,6 +176,7 @@ Maybe<Type> ::= t1::Type t2::Type
     | intType(), strType() -> just(t2)
     | strType(), strType() -> just(t1)
     | listType(s1), listType(s2) -> convertType(s1, s2)
+    | setType(s1), setType(s2) -> convertType(s1, s2)
     | functionType(p1, r1), functionType(p2, r2) ->
         case convertParams(p1, p2), convertType(r1, r2) of
           just(p), just(r) -> just(functionType(p, r))
@@ -181,6 +192,8 @@ Maybe<Type> ::= t1::Type t2::Type
           nothing() -> nothing()
         | just(f) -> just(structureType(f))
         end
+    | structureType(_), _ -> just(anyType()) -- Temporary hack until better checking is implimented for overloaded operators
+    | dataType(_, _), _ -> just(anyType())
     | extendsType(n1, dataType(n2, f1)), dataType(n3, f2) -> 
         if n1.name == n3.name || n2.name == n3.name
         then just(dataType(n3, f1)) -- Data types with the same name must be identical

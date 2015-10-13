@@ -1,30 +1,31 @@
 # gia standard util
 
 # Maybe
-datatype Maybe = {hasValue: bool, value};
+datatype Maybe = {hasValue: bool, value, cond: bool};
 
 Some(x): Maybe {
   hasValue = true;
   value = x;
-  
+  cond = true;
 }
 
 None(): Maybe {
   hasValue = false;
   value = error("Demanded value from None");
+  cond = false;
 }
 
 # List
 null(l: any*): bool {
-  return !(l ~ (_ :: _)).value;
+  return !(l ~ (_ :: _)).hasValue;
 }
 
 head(l: any*): any {
-  return l[0];
+  return if null(l) then error("Head called on null list") else l[0];
 }
 
 tail(l: any*): any* {
-  return (l ~ (@_ :: _)).value[0];
+  return if null(l) then error("Tail called on null list") else (l ~ (_ :: @_)).value[0];
 }
 
 # Util functions
@@ -52,4 +53,39 @@ containsBy(f: (any, any) -> bool, x, items: any*): bool {
     else if f(head(items), x)
     then true
     else containsBy(f, x, tail(items));
+}
+
+# Map
+datatype MapEntry = {key, value, eq: (any) -> bool}; # TODO: Fix bug with parameter type names missing
+datatype Map = {entries: MapEntry%, index: (any) -> any};
+
+MapEntry(k, v): MapEntry {
+  key = k;
+  value = v;
+  eq = fn(other) (other == key);
+}
+
+Map(ks, vs): Map {
+  entries =
+    if null(ks)
+    then {}
+    else put(head(ks), head(vs), Map(tail(ks), tail(vs)).entries);
+  index = fn(x)(get(x, self));
+}
+
+MapFromSet(s): Map {
+  entries = s;
+  index = fn(x)(get(x, self));
+}
+
+put(k, v, m: Map): Map {
+  return MapFromSet({MapEntry(k, v)} | m.entries);
+}
+
+contains(k, m: Map): bool {
+  return m.entries[k].value.hasValue;
+}
+
+get(k, m: Map) {
+  return m.entries[k].value.value;
 }

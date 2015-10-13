@@ -110,8 +110,8 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
   -- Dummy values provided for error checking
   b.typeEnv =
     if !mte.isJust
-    then addEnv(p.typeDefs ++ [pair(n.name, functionType(p.types, anyType()))], d.typeEnv)
-    else addEnv(p.typeDefs ++ d.typeDefs, d.typeEnv);
+    then addEnv(p.typeDefs ++ [pair(n.name, functionType(p.types, anyType())), pair("self", mte.type)], d.typeEnv)
+    else addEnv(p.typeDefs ++ d.typeDefs ++ [pair("self", mte.type)], d.typeEnv);
   b.typeNameEnv = d.typeNameEnv;
   d.ruleTypes = [pair(n.name, anyType())];--e.type
 }

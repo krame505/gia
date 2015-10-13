@@ -134,28 +134,35 @@ e::Expr ::= f::Expr args::Exprs
   
   local body::Decls =
     case f.value of
-      val:functionValue(_, _, _, body) -> body
+      val:functionValue(_, _, _, _, _, body) -> body
     end;
   body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
   body.typeNameEnv = error("Value should not depend on typeNameEnv"); -- TODO: Find bad dependency
   body.env =
     case f.value of
-      val:functionValue(n, env, _, _) -> 
-        addEnv(params.defs ++ [pair(n, f.value)], env)
+      val:functionValue(n, env, params, _, paramNames, _) -> 
+        addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", e.value)], env)
     end;
   
+  local argRuntimeErrors::[Message] = valuesErrors(args.values);
   e.value =
-    case f.value of
-      val:functionValue(n, env, params, _) ->
+    if null(argRuntimeErrors)
+    then case f.value of
+      val:functionValue(n, env, _, _, _, _) ->
         case body.returnValue of
           just(v) -> v
-        | _ -> val:nodeValue(n, args.values, body.defs)
+        | _ -> 
+          case f.value.type of
+            functionType(_, dataType(dt, _)) -> val:nodeValue(n, just(dt), args.values, body.defs)
+          | _ -> val:nodeValue(n, nothing(), args.values, body.defs)
+          end
         end
-    end;
+    end
+    else val:errorValue(argRuntimeErrors);
   
   e.matchRes = 
     case f, e.matchValue of
-      nameLiteral(n), val:nodeValue(m, _, _) -> 
+      nameLiteral(n), val:nodeValue(m, _, _, _) -> 
         if n.name == m
         then args.matchRes
         else val:constructNone()
@@ -164,17 +171,21 @@ e::Expr ::= f::Expr args::Exprs
   
   args.matchValue = 
     case e.matchValue of
-      val:nodeValue(_, children, _) -> val:listValue(children)
+      val:nodeValue(_, _, children, _) -> val:listValue(children)
     | _ -> error("Demanded match values when value type differs")
     end;
-  
-  local params::Params =
-    case f.value of
-      val:functionValue(n, env, params, body) -> params
+}
+
+function valuesErrors
+[Message] ::= vs::[Value]
+{
+  return
+    if null(vs)
+    then []
+    else case head(vs) of
+      errorValue(ms) -> ms
+    | _ -> valuesErrors(tail(vs))
     end;
-  params.args = args.values;
-  params.typeEnv = e.typeEnv;
-  params.typeNameEnv = e.typeNameEnv;
 }
 
 abstract production lambdaExpr
@@ -189,7 +200,7 @@ e::Expr ::= params::Params body::Expr
   body.env = addEnv(params.defs, e.env);
   
   local id::String = toString(genInt());
-  e.value = val:functionValue(s"<lambda ${id}>", e.env, params, returnDecl(body));
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, params.types, body.type, params.names, returnDecl(body));
 }
 
 abstract production addOp
@@ -246,7 +257,12 @@ e::Expr ::= e1::Expr e2::Expr
   e.value = e1.value.val:and(e2.value, e.location);
   e1.matchValue = e.matchValue;
   e2.matchValue = e.matchValue;
-  e.matchRes = e1.matchRes.val:and(e2.matchRes, e.location); -- TODO
+  e.matchRes = 
+    case e1.matchRes.access(name("value", location=bogusLocation), bogusLocation),
+         e2.matchRes.access(name("value", location=bogusLocation), bogusLocation) of
+      listValue(l1), listValue(l2) -> constructSome(listValue(l1 ++ l2))
+    | _, _ -> constructNone()
+    end;
 }
 
 abstract production orOp
@@ -258,7 +274,11 @@ e::Expr ::= e1::Expr e2::Expr
   e.value = e1.value.val:or(e2.value, e.location);
   e1.matchValue = e.matchValue;
   e2.matchValue = e.matchValue;
-  e.matchRes = e1.matchRes.val:or(e2.matchRes, e.location); -- TODO
+  e.matchRes = 
+    case e1.matchRes.access(name("hasValue", location=bogusLocation), bogusLocation) of
+      trueValue() -> e1.matchRes
+    | _ -> constructNone()
+    end;
 }
 
 abstract production notOp
@@ -306,7 +326,15 @@ e::Expr ::= h::Expr t::Expr
     case h.value, t.value of
       errorValue(_), _ -> h.value
     | _, errorValue(_) -> t.value
-    | v, val:listValue(vs) -> val:listValue(v :: vs)
+    | v, val:listValue(vs) -> 
+      case t.value.type of
+        listType(t2) ->
+          case convertType(h.value.type, t2) of
+            nothing() -> val:errorValue(convertTypeErrors(h.value.type, t2, "::", e.location))
+          | just(_) -> val:listValue(v :: vs)
+          end
+      | _ -> val:opError("::", h.value, t.value, e.location)
+      end
     | _, _ -> val:opError("::", h.value, t.value, e.location)
     end;
   
@@ -324,7 +352,7 @@ e::Expr ::= h::Expr t::Expr
   
   e.matchRes =
     case e.matchValue of
-      val:listValue(_) ->
+      val:listValue(_ :: _) ->
       case h.matchRes.access(name("value", location=bogusLocation), bogusLocation),
            t.matchRes.access(name("value", location=bogusLocation), bogusLocation) of
         val:listValue(vs1), val:listValue(vs2) -> val:constructSome(val:listValue(vs1 ++ vs2))
