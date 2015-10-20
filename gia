@@ -29,6 +29,7 @@ fi
 STDLIB=$HOME_DIR/lib/stdlib.gia
 
 LOAD_LIST="$STDLIB $@"
+DECL_LIST=""
 
 function run_gia {
     LOAD_SCRIPT=""
@@ -37,7 +38,7 @@ function run_gia {
         LOAD_SCRIPT+="use \"$FILE\"; "
     done
 
-    java -jar $JAR_NAME "$LOAD_SCRIPT" "User input" $@
+    java -jar $JAR_NAME "$LOAD_SCRIPT $DECL_LIST" "User input" $@
 }
 
 run_gia "\"Loaded\""
@@ -71,7 +72,26 @@ do
                 ${@:2}
                 ;;
             *)
-                run_gia $@
+                case $@ in
+                    type*\;|datatype*\;)
+                        OLD_DECL_LIST=$DECL_LIST
+                        DECL_LIST+="$@"
+                        run_gia "\"OK\"" || DECL_LIST=$OLD_DECL_LIST
+                        ;;
+                    *\;)
+                        TXT="$@"
+                        VAR1=${TXT%\=*}
+                        VAR2=${VAR1%:*}
+                        VAR=`xargs <<<$VAR2`
+                        OLD_DECL_LIST=$DECL_LIST
+                        DECL_LIST+="$@"
+                        RESULT=$(run_gia "$VAR") && echo "$VAR = $RESULT" || (DECL_LIST=$OLD_DECL_LIST; echo -e "$RESULT")
+                        ;;
+                    *)
+                        run_gia $@
+                        ;;
+                esac
+                ;;
         esac
     fi
     history -s "$LINE"
