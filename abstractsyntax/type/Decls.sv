@@ -73,11 +73,12 @@ d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
 }
 
 aspect production valDecl
-d::Decl ::= n::Name e::Expr
+d::Decl ::= n::Name te::TypeExpr e::Expr
 {
-  d.typeDefs = [pair(n.name, e.type)];
+  d.errors <- convertTypeExpectedErrors(e.type, te.type, "value declaration", d.location);
+  d.typeDefs = [pair(n.name, te.type)];--convertTypeOrAny(e.type, te.type)
   d.typeNameDefs = [];
-  d.ruleTypes = [pair(n.name, anyType())];--e.type
+  d.ruleTypes = [pair(n.name, te.type)];--convertTypeOrAny(e.type, te.type)
 }
 
 aspect production nodeDecl

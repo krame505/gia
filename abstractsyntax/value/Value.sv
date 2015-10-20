@@ -51,9 +51,9 @@ v::Value ::=
 {
   v.pp = text("true");
   v.type = boolType();
-  v.eq = checkType(eqTrue(_, _), _, boolType(), "==", _);
-  v.and = checkType(and(v, _, _), _, boolType(), "&", _);
-  v.or = checkType(binaryIdentity(v, _, _), _, boolType(), "|", _);
+  v.eq = eqTrue(_, _);
+  v.and = andBool(v, _, _);
+  v.or = orBool(v, _, _);
   v.not = unaryIdentity(falseValue(), _);
   v.cond = unaryIdentity(v, _);
 }
@@ -63,9 +63,9 @@ v::Value ::=
 {
   v.pp = text("false");
   v.type = boolType();
-  v.eq = checkType(eqFalse(_, _), _, boolType(), "==", _);
-  v.and = checkType(binaryIdentity(v, _, _), _, boolType(), "&", _);
-  v.or = checkType(binaryIdentity(_, v, _), _, boolType(), "|", _);
+  v.eq = eqFalse(_, _);
+  v.and = andBool(v, _, _);
+  v.or = orBool(v, _, _);
   v.not = unaryIdentity(trueValue(), _);
   v.cond = unaryIdentity(v, _);
 }
@@ -98,10 +98,10 @@ abstract production listValue
 v::Value ::= contents::[Value]
 {
   v.pp = pp"[${ppImplode(text(", "), map((.pp), contents))}]";
-  v.type = listType(foldr(mergeTypesOrAny, anyType(), map((.type), contents)));
+  v.type = listType(foldr(mergeTypesOrDynamic, anyType(), map((.type), contents)));
   v.index = indexList(contents, _, _);
-  v.add = checkType(catList(contents, _, _), _, v.type, "+", _);
-  v.eq = checkType(eqList(contents, _, _), _, v.type, "==", _);
+  v.add = catList(contents, _, _);
+  v.eq = eqList(contents, _, _);
   v.cond = unaryIdentity(if null(contents) then falseValue() else trueValue(), _);
 }
 
@@ -110,13 +110,13 @@ abstract production setValue
 v::Value ::= contents::[Value]
 {
   v.pp = pp"{${ppImplode(text(", "), map((.pp), contents))}}";
-  v.type = setType(foldr(mergeTypesOrAny, anyType(), map((.type), contents)));
+  v.type = setType(foldr(mergeTypesOrDynamic, anyType(), map((.type), contents)));
   v.index = indexSet(contents, _, _);
---  v.add = checkType(unionSet(contents, _, _), _, v.type, "|", _);
-  v.sub = checkType(removeSet(contents, _, _), _, case v.type of setType(t) -> t end, "-", _);
-  v.and = checkType(intersectSet(contents, _, _), _, v.type, "&", _);
-  v.or = checkType(unionSet(contents, _, _), _, v.type, "|", _);
-  v.eq = checkType(eqSet(contents, _, _), _, v.type, "==", _);
+--  v.add = unionSet(contents, _, _);
+  v.sub = removeSet(contents, _, _);
+  v.and = intersectSet(contents, _, _);
+  v.or = unionSet(contents, _, _);
+  v.eq = eqSet(contents, _, _);
   v.cond = unaryIdentity(if null(contents) then falseValue() else trueValue(), _);
 }
 
@@ -150,11 +150,11 @@ v::Value ::= name::String datatypeName::Maybe<Name> children::[Value] bindings::
 }
 
 abstract production lazyValue
-v::Value ::= env::ValueEnv expr::Expr
+v::Value ::=  env::ValueEnv typeNameEnv::TypeEnv expr::Expr
 {
   expr.env = env;
   expr.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
-  expr.typeNameEnv = error("Value should not depend on typeNameEnv"); -- TODO: Find bad dependency
+  expr.typeNameEnv = typeNameEnv; -- Needed for run-time type checking
   forwards to expr.value;
 }
 
@@ -183,7 +183,8 @@ Value ::= v::Value loc::Location
   return
     case v of
       falseValue() -> falseValue()
-    | _ -> trueValue()
+    | trueValue() -> trueValue()
+    | _ -> opError("==", trueValue(), v, loc)
     end;
 }
 
@@ -193,18 +194,32 @@ Value ::= v::Value loc::Location
   return
     case v of
       falseValue() -> trueValue()
-    | _ -> falseValue()
+    | trueValue() -> falseValue()
+    | _ -> opError("==", falseValue(), v, loc)
     end;
 }
 
-function and
+function andBool
 Value ::= v1::Value v2::Value loc::Location
 {
   return
     case v1, v2 of
       falseValue(), _ -> falseValue()
-    | _, falseValue() -> falseValue()
-    | _, _ -> v1
+    | trueValue(), falseValue() -> falseValue()
+    | trueValue(), trueValue() -> trueValue()
+    | _, _ -> opError("==", v1, v2, loc)
+    end;
+}
+
+function orBool
+Value ::= v1::Value v2::Value loc::Location
+{
+  return
+    case v1, v2 of
+      trueValue(), _ -> trueValue()
+    | falseValue(), trueValue() -> trueValue()
+    | falseValue(), falseValue() -> falseValue()
+    | _, _ -> opError("==", v1, v2, loc)
     end;
 }
 
@@ -347,7 +362,7 @@ Value ::= l::[Value] v::Value loc::Location
 {
   return
     case l, v of
-      w :: t1, listValue(x :: t2) -> and(w.eq(x, loc), eqList(t1, listValue(t2), loc), loc)
+      w :: t1, listValue(x :: t2) -> andBool(w.eq(x, loc), eqList(t1, listValue(t2), loc), loc)
     | [], listValue([]) -> trueValue()
     | _, listValue([]) -> falseValue()
     | [], listValue(_) -> falseValue()
@@ -496,14 +511,6 @@ Value ::= op::String v::Value loc::Location
       errorValue(_) -> v
     | _ -> errorValue([err(loc, s"${op} undefined for ${show(80, v.type.pp)}")])
     end;
-}
-
-function checkType
-Value ::= fn::(Value ::= Value Location) v::Value t::Type op::String loc::Location
-{
-  local errors::[Message] = mergeTypesErrors(t, v.type, op, loc);
-  
-  return if !null(errors) then errorValue(errors) else fn(v, loc);
 }
 
 -- Util

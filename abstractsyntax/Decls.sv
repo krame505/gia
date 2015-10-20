@@ -96,10 +96,10 @@ d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
 }
 
 abstract production valDecl
-d::Decl ::= n::Name e::Expr
+d::Decl ::= n::Name te::TypeExpr e::Expr
 {
   d.errors := e.errors;
-  d.defs = [pair(n.name, val:lazyValue(d.env, e))];
+  d.defs = [pair(n.name, val:lazyValue(d.env, d.typeNameEnv, e))];
   d.rules = [pair(n.name, e)];
 }
 

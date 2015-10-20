@@ -23,6 +23,13 @@ t::Type ::=
   t.pp = text("any");
 }
 
+-- Used to denote finding multiple different types in lists, etc.  
+abstract production dynamicType
+t::Type ::=
+{
+  t.pp = text("<various>");
+}
+
 abstract production boolType
 t::Type ::=
 {
@@ -123,6 +130,16 @@ Type ::= t1::Type t2::Type
     end;
 }
 
+function mergeTypesOrDynamic
+Type ::= t1::Type t2::Type
+{
+  return
+    case mergeTypes(t1, t2) of
+      just(t) -> t
+    | nothing() -> dynamicType()
+    end;
+}
+
 function mergeTypes
 Maybe<Type> ::= t1::Type t2::Type
 {
@@ -167,13 +184,18 @@ Type ::= t1::Type t2::Type
 function convertType
 Maybe<Type> ::= t1::Type t2::Type
 {
-  return
+  return 
     case t1, t2 of
       _, anyType() -> just(t1)
     | anyType(), _ -> just(t2)
+    | dynamicType(), anyType() -> just(t2)
+    | _, namedType(n, t3) ->
+      case convertType(t1, t3) of
+        nothing() -> nothing()
+      | just(t) -> just(namedType(n, t))
+      end
     | boolType(), boolType() -> just(t1)
     | intType(), intType() -> just(t1)
-    | intType(), strType() -> just(t2)
     | strType(), strType() -> just(t1)
     | listType(s1), listType(s2) -> convertType(s1, s2)
     | setType(s1), setType(s2) -> convertType(s1, s2)

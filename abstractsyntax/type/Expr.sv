@@ -66,16 +66,18 @@ e::Expr ::= f::Expr args::Exprs
     case f.type of
       anyType() -> []
     | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
+    | _ -> [err(f.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
   e.patternErrors <- 
     case f.type of
       anyType() -> []
     | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
+    | _ -> [err(f.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
   e.type =
     case f.type of
-      anyType() -> anyType()
-    | functionType(params, ret) -> ret
+      functionType(params, ret) -> ret
+    | _ -> anyType()
     end;
 }
 
@@ -92,7 +94,7 @@ function paramErrors
         [err(loc, s"Invalid type for parameter ${toString(index)} in function call (expected ${show(80, p.pp)}, got ${show(80, a.pp)})")]
       end ++ paramErrors(params, args, index + 1, loc)
     | _, _ ->
-      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index - 1)})")]
+      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index)})")]
     end;
 }
 
@@ -214,7 +216,7 @@ e::Expr ::= h::Expr t::Expr
 {
   e.errors <-
     case h.type, t.type of
-      t1, listType(t2) -> mergeTypesErrors(t1, t2, "::", e.location)
+      t1, listType(t2) -> [] --mergeTypesErrors(t1, t2, "::", e.location)
     | anyType(), listType(_) -> []
     | _, listType(anyType()) -> []
     | _, anyType() -> []
@@ -266,15 +268,13 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
 aspect production constructList
 e::Expr ::= el::Exprs
 {
-  e.errors <- el.listTypeErrors;
-  e.type = listType(foldr(mergeTypesOrAny, anyType(), el.types));
+  e.type = listType(el.mergeTypes);
 }
 
 aspect production constructSet
 e::Expr ::= el::Exprs
 {
-  e.errors <- el.setTypeErrors;
-  e.type = setType(foldr(mergeTypesOrAny, anyType(), el.types));
+  e.type = setType(el.mergeTypes);
 }
 
 aspect production letExpr
@@ -286,30 +286,23 @@ e::Expr ::= ds::Decls e1::Expr
   e.type = e1.type;
 }
 
-synthesized attribute listTypeErrors::[Message] with ++;
-synthesized attribute setTypeErrors::[Message] with ++;
-attribute listTypeErrors occurs on Exprs;
-attribute setTypeErrors occurs on Exprs;
 synthesized attribute types::[Type] occurs on Exprs, Params;
+synthesized attribute mergeTypes::Type occurs on Exprs;
 
 aspect production consExpr
 e::Exprs ::= h::Expr t::Exprs
 {
-  e.listTypeErrors :=
-    if null(t.types)
-    then []
-    else mergeTypesErrors(h.type, head(t.types), "list construction", h.location) ++ t.listTypeErrors;
-  e.setTypeErrors :=
-    if null(t.types)
-    then []
-    else mergeTypesErrors(h.type, head(t.types), "set construction", h.location) ++ t.setTypeErrors;
   e.types = h.type :: t.types;
+  e.mergeTypes =
+    case t.mergeTypes of
+      dynamicType() -> dynamicType()
+    | _ -> mergeTypesOrDynamic(h.type, t.mergeTypes)
+    end;
 }
 
 aspect production nilExpr
 e::Exprs ::= 
 {
-  e.listTypeErrors := [];
-  e.setTypeErrors := [];
   e.types = [];
+  e.mergeTypes = anyType();
 }

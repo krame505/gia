@@ -137,14 +137,19 @@ e::Expr ::= f::Expr args::Exprs
       val:functionValue(_, _, _, _, _, body) -> body
     end;
   body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
-  body.typeNameEnv = error("Value should not depend on typeNameEnv"); -- TODO: Find bad dependency
+  body.typeNameEnv = e.typeNameEnv; -- Need for run-time type checking
   body.env =
     case f.value of
       val:functionValue(n, env, params, _, paramNames, _) -> 
-        addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", e.value)], env)
+        addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", lazyValue(e.env, e.typeNameEnv, e))], env)
     end;
   
-  local argRuntimeErrors::[Message] = valuesErrors(args.values);
+  local argRuntimeErrors::[Message] =
+    valuesErrors(args.values) ++
+    case f.value.type of
+      functionType(params, _) -> paramErrors(params, map((.type), args.values), 1, e.location)
+    | _ -> [err(f.location, "Cannot apply non-function")]
+    end;
   e.value =
     if null(argRuntimeErrors)
     then case f.value of
@@ -326,15 +331,7 @@ e::Expr ::= h::Expr t::Expr
     case h.value, t.value of
       errorValue(_), _ -> h.value
     | _, errorValue(_) -> t.value
-    | v, val:listValue(vs) -> 
-      case t.value.type of
-        listType(t2) ->
-          case convertType(h.value.type, t2) of
-            nothing() -> val:errorValue(convertTypeErrors(h.value.type, t2, "::", e.location))
-          | just(_) -> val:listValue(v :: vs)
-          end
-      | _ -> val:opError("::", h.value, t.value, e.location)
-      end
+    | v, val:listValue(vs) -> val:listValue(v :: vs)
     | _, _ -> val:opError("::", h.value, t.value, e.location)
     end;
   
