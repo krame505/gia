@@ -8,7 +8,7 @@ d::Decls ::= h::Decl t::Decls
 {
   d.typeDefs = h.typeDefs ++ t.typeDefs;
   d.typeNameDefs = h.typeNameDefs ++ t.typeNameDefs;
-  h.typeEnv = addEnv(h.typeNameRecDefs ++ t.typeDefs, d.typeEnv);
+  h.typeEnv = addEnv(h.typeRecDefs ++ t.typeDefs, d.typeEnv);
   t.typeEnv = addEnv(h.typeDefs, d.typeEnv);
   h.typeNameEnv = addEnv(h.typeNameRecDefs ++ t.typeNameDefs, d.typeNameEnv);
   t.typeNameEnv = addEnv(h.typeNameDefs, d.typeNameEnv);
@@ -84,41 +84,32 @@ aspect production valDecl
 d::Decl ::= n::Name mte::MaybeTypeExpr e::Expr
 {
   d.errors <- convertTypeExpectedErrors(e.type, mte.type, "value declaration", d.location);
-  d.typeDefs = [pair(n.name, mte.type)];--convertTypeOrAny(e.type, te.type)
+  d.typeDefs = [pair(n.name, mte.type)];--convertTypeOrAny(e.type, mte.type)--TODO, fix type inference when there is no type expression
   d.typeRecDefs =
     if mte.isJust
     then [pair(n.name, mte.type)]
     else [pair(n.name, anyType())];
   d.typeNameDefs = [];
   d.typeNameRecDefs = [];
-  d.ruleTypes = [pair(n.name, mte.type)];--convertTypeOrAny(e.type, te.type)
+  d.ruleTypes = [pair(n.name, convertTypeOrAny(e.type, mte.type))];--convertTypeOrAny(e.type, mte.type)
 }
 
 aspect production nodeDecl
-d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
+d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
 {
   d.errors <- 
-     case b.returnType of
-       just(t) -> convertTypeErrors(mte.type, t, "expected and actual return types", d.location)
-     | nothing() ->
-       if mte.isJust
-       then
-         case mte.type of
-           dataType(_, fields) ->
-             case convertFields(b.ruleTypes, fields) of
-               just(_) -> []
-             | _ -> [err(d.location, s"Incompatible types for expected and actual fields: ${show(80, structureType(b.ruleTypes).pp)}, ${show(80, structureType(fields).pp)}")]
-             end
-           | _ -> [err(mte.location, s"Node must have data type or structure type, but found ${show(80, mte.type.pp)}")]
+     case b.type, mte.type of
+       structureType(f1), dataType(_, f2) ->
+         case convertFields(f1, f2) of
+           just(_) -> []
+         | _ -> [err(d.location, s"Incompatible types for expected and actual fields: ${show(80, structureType(f2).pp)}, ${show(80, structureType(f1).pp)}")]
          end
-       else []
+     | _, _ -> convertTypeErrors(mte.type, b.type, "expected and actual return types", d.location)
      end;
   d.typeDefs =
     if mte.isJust
     then [pair(n.name, functionType(p.types, mte.type))]
-    else if b.returnType.isJust
-    then [pair(n.name, functionType(p.types, b.returnType.fromJust))]
-    else [pair(n.name, functionType(p.types, structureType(b.ruleTypes)))];
+    else [pair(n.name, functionType(p.types, b.type))];
   d.typeRecDefs =
     if mte.isJust
     then [pair(n.name, functionType(p.types, mte.type))]

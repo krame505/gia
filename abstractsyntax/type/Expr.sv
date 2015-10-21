@@ -94,7 +94,7 @@ function paramErrors
         [err(loc, s"Invalid type for parameter ${toString(index)} in function call (expected ${show(80, p.pp)}, got ${show(80, a.pp)})")]
       end ++ paramErrors(params, args, index + 1, loc)
     | _, _ ->
-      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index - 1)})")]
+      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index)})")]
     end;
 }
 
@@ -288,14 +288,16 @@ e::Expr ::= el::Exprs
   e.type = setType(el.mergeTypes);
 }
 
-aspect production letExpr
-e::Expr ::= ds::Decls e1::Expr
+aspect production declExpr
+e::Expr ::= ds::Decls
 {
-  e1.typeEnv = addEnv(ds.typeDefs, e.typeEnv);
-  e1.typeNameEnv = addEnv(ds.typeNameDefs, e.typeNameEnv);
   ds.typeNameExtendsEnv = e.typeNameEnv;
   
-  e.type = e1.type;
+  e.type =
+    case ds.returnType of
+      just(t) -> t
+    | nothing() -> structureType(ds.ruleTypes)
+    end;
 }
 
 synthesized attribute types::[Type] occurs on Exprs, Params;

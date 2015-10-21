@@ -132,13 +132,12 @@ e::Expr ::= f::Expr args::Exprs
     end ++ args.patternErrors;
   e.pp = concat([f.pp, text("("), args.pp, text(")")]);
   
-  local body::Decls =
+  local body::Expr =
     case f.value of
       val:functionValue(_, _, _, _, _, body) -> body
     end;
   body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
   body.typeNameEnv = e.typeNameEnv; -- Need for run-time type checking
-  body.typeNameExtendsEnv = e.typeNameEnv; -- Need for run-time type checking
   body.env =
     case f.value of
       val:functionValue(n, env, params, _, paramNames, _) -> 
@@ -154,14 +153,10 @@ e::Expr ::= f::Expr args::Exprs
   e.value =
     if null(argRuntimeErrors)
     then case f.value of
-      val:functionValue(n, env, _, _, _, _) ->
-        case body.returnValue of
-          just(v) -> v
-        | _ -> 
-          case f.value.type of
-            functionType(_, t) -> val:nodeValue(n, left(t), args.values, body.defs)
-          | _ -> val:nodeValue(n, right(nothing()), args.values, body.defs)
-          end
+      val:functionValue(n, env, _, ret, _, _) ->
+        case ret, body.value of
+          dataType(_, _), structureValue(fields) -> val:nodeValue(n, left(ret), args.values, fields)
+        | _, _ -> body.value
         end
     end
     else val:errorValue(argRuntimeErrors);
@@ -206,7 +201,7 @@ e::Expr ::= params::Params body::Expr
   body.env = addEnv(params.defs, e.env);
   
   local id::String = toString(genInt());
-  e.value = val:functionValue(s"<lambda ${id}>", e.env, params.types, body.type, params.names, returnDecl(body));
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, params.types, body.type, params.names, body);
 }
 
 abstract production addOp
@@ -465,16 +460,23 @@ e::Expr ::= el::Exprs
   e.value = val:setValue(nubBy(val:eqValue, el.values));
 }
 
-abstract production letExpr
-e::Expr ::= ds::Decls e1::Expr
+abstract production declExpr
+e::Expr ::= ds::Decls
 {
-  e.errors := ds.errors ++ e1.errors;
-  e.patternErrors := [err(e.location, "Let cannot occur in pattern expression")];
-  e.pp = pp"let {<decls>} in el.pp";
+  e.errors := ds.errors;
+  e.patternErrors := [err(e.location, "Decls cannot occur in pattern expression")];
+  e.pp = pp"{<decls>}"; -- TODO
   
-  e1.env = addEnv(ds.defs, e.env);
-  
-  e.value = e1.value;
+  e.value =
+    case ds.returnValue of
+      just(v) -> v
+    | _ ->
+      val:structureValue(
+        zipWith(
+          pair,
+          map(fst, ds.rules),
+          map(lazyValue(addEnv(ds.defs, e.env), addEnv(ds.typeNameDefs, e.typeNameEnv), _), map(snd, ds.rules))))
+    end;
 }
 
 synthesized attribute values::[val:Value];

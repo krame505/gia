@@ -104,15 +104,11 @@ d::Decl ::= n::Name mte::MaybeTypeExpr e::Expr
 }
 
 abstract production nodeDecl
-d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
+d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
 {
   d.errors := p.errors ++ mte.errors ++ b.errors;
-  d.defs = [pair(n.name, val:functionValue(n.name, d.env, p.types, if b.returnType.isJust then b.returnType.fromJust else anyType(), p.names, b))];
-  d.rules =
-    case b.returnExpr of
-      just(e) -> [pair(n.name, lambdaExpr(p, letExpr(b, e, location=d.location), location=d.location))]
-    | nothing() -> []
-    end;
+  d.defs = [pair(n.name, val:functionValue(n.name, d.env, p.types, mte.type, p.names, b))];
+  d.rules = [pair(n.name, lambdaExpr(p, b, location=d.location))];
   
   -- Dummy values provided for error checking
   p.args = [];

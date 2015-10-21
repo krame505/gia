@@ -63,6 +63,11 @@ terminal RCurly_t     '}';
 terminal Colon_t      ':';
 terminal Assign_t     '='  lexer classes {Symbol};
 
+-- TODO, temporary hack, means no function calls inside set creation (?)
+disambiguate LParen_t, LALParen_t {
+  pluck LParen_t;
+}
+
 -- Operators
 terminal Cons_t     '::' precedence = 1, association = right, lexer classes {Symbol};
 terminal Or_t       '|'  precedence = 2, association = left, lexer classes {Symbol};

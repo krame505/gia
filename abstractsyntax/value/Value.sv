@@ -125,21 +125,20 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::ValueEnv params::[Type] ret::Type paramNames::[String] body::Decls
+v::Value ::= name::String env::ValueEnv params::[Type] ret::Type paramNames::[String] body::Expr
 {
   v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params))})";
   v.type = functionType(params, ret);
 }
 
 abstract production nodeValue
-v::Value ::= name::String type::Either<Type Maybe<Name>> children::[Value] bindings::[Pair<String Value>]
+v::Value ::= name::String type::Either<Type Name> children::[Value] bindings::[Pair<String Value>]
 {
   v.pp = pp"${text(name)}(${ppImplode(text(", "), map((.pp), children))})";
   v.type =
     case type of
       left(t) -> t
-    | right(just(n)) -> dataType(n, zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
-    | right(nothing()) -> structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
+    | right(n) -> dataType(n, zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
     end;
   v.access = access(bindings, _, _);
   v.eq = eqNode(name, children, bindings, _, _);
@@ -152,6 +151,30 @@ v::Value ::= name::String type::Either<Type Maybe<Name>> children::[Value] bindi
   v.or = nodeOp("or", bindings, _, _);
   v.not = unaryNodeOp("not", bindings, _);
   v.cond = unaryNodeOp("cond", bindings, _);
+}
+
+abstract production structureValue
+v::Value ::= bindings::[Pair<String Value>]
+{
+  v.pp = pp"{${ppImplode(text(", "), map((bindingPP), bindings))}}";
+  v.type = structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))));
+  v.access = access(bindings, _, _);
+  v.eq = eqStructure(bindings, _, _);
+  v.add = nodeOp("add", bindings, _, _);
+  v.sub = nodeOp("sub", bindings, _, _);
+  v.mul = nodeOp("mul", bindings, _, _);
+  v.div = nodeOp("div", bindings, _, _);
+  v.gt = nodeOp("gt", bindings, _, _);
+  v.and = nodeOp("and", bindings, _, _);
+  v.or = nodeOp("or", bindings, _, _);
+  v.not = unaryNodeOp("not", bindings, _);
+  v.cond = unaryNodeOp("cond", bindings, _);
+}
+
+function bindingPP
+Document ::= b::Pair<String Value>
+{
+  return pp"${text(b.fst)} = ${b.snd.pp}";
 }
 
 abstract production lazyValue
@@ -528,9 +551,41 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
   return
     case lookup, v of
       functionValue(_, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
-    | _, nodeValue(n1, _, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else falseValue()
-    | _, _ -> opError("==", nodeValue(n, right(nothing()), l, []), v, loc)
+    | _, nodeValue(n1, _, l1, _) ->
+      if n == n1
+      then eqList(l, listValue(l1), loc)
+      else falseValue()
+    | _, structureValue(fields) ->
+      if foldr(boolAnd, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
+      then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
+      else falseValue()
+    | _, _ -> opError("==", nodeValue(n, right(name(n, location=bogusLocation)), l, []), v, loc)
     end;
+}
+
+function eqStructure
+Value ::= bindings::[Pair<String Value>] v::Value loc::Location
+{
+  local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
+  return
+    case lookup, v of
+      functionValue(_, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+    | _, nodeValue(_, _, _, fields) ->
+      if foldr(boolAnd, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
+      then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
+      else falseValue()
+    | _, structureValue(fields) ->
+      if foldr(boolAnd, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
+      then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
+      else falseValue()
+    | _, _ -> opError("==", structureValue(bindings), v, loc)
+    end;
+}
+
+function boolAnd
+Boolean ::= b1::Boolean b2::Boolean
+{
+  return b1 && b2;
 }
 
 function nameOpError
@@ -571,7 +626,7 @@ Value ::= v::Value
   return
     nodeValue(
       "Some",
-      right(just(name("Maybe", location=bogusLocation))),
+      right(name("Maybe", location=bogusLocation)),
       [v],
       [pair("hasValue", trueValue()),
        pair("value", v)]);
@@ -583,7 +638,7 @@ Value ::=
   return
     nodeValue(
       "None",
-      right(just(name("Maybe", location=bogusLocation))),
+      right(name("Maybe", location=bogusLocation)),
       [],
       [pair("hasValue", falseValue()),
        pair("value", errorValue([err(bogusLocation, "Demanded value from None")]))]);

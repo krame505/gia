@@ -158,14 +158,14 @@ concrete productions e::Expr
     e.ast = abs:errorExpr(e1.ast, location=e.location);
     e.pp = pp"error(${e1.pp})";
   }
-| 'let' '{' ds::Decls '}' 'in' e1::Expr
+| '{' ds::Decls '}'
   {
-    e.ast = abs:letExpr(ds.ast, e1.ast, location=e.location);
-    e.pp = pp"let {<decls>} in el.pp"; --TODO
+    e.ast = abs:declExpr(ds.ast, location=e.location);
+    e.pp = pp"{<decls>}"; --TODO
     
-    ds.ioIn = error("Use decl in let"); --TODO
-    ds.currentDir = error("Use decl in let"); --TODO
-    ds.parse = error("Use decl in let"); --TODO
+    ds.ioIn = error("Non-global use decl"); --TODO
+    ds.currentDir = error("Non-global use decl"); --TODO
+    ds.parse = error("Non-global use decl"); --TODO
   }
 
 closed nonterminal Exprs with ast<abs:Exprs>, pp;

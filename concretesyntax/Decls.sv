@@ -11,6 +11,14 @@ d::Decls ::= h::Decl t::Decls
   d.ioOut = t.ioOut;
 }
 
+concrete production oneDecl
+d::Decls ::= h::Decl
+{
+  d.ast = abs:consDecl(h.ast, abs:nilDecl());
+  h.ioIn = d.ioIn;
+  d.ioOut = h.ioOut;
+}
+
 concrete production returnDecl
 d::Decls ::= 'return' e::Expr ';'
 {
@@ -18,12 +26,14 @@ d::Decls ::= 'return' e::Expr ';'
   d.ioOut = d.ioIn;
 }
 
+{- Not allowed due to parse conflict with empty set
 concrete production nilDecl
 d::Decls ::= 
 {
   d.ast = abs:nilDecl();
   d.ioOut = d.ioIn;
 }
+-}
 
 abstract production parseErrorDecls
 d::Decls ::= errorTxt::String
@@ -87,20 +97,21 @@ d::Decl ::= 'datatype' n::Id_t me::MaybeExtends '=' te::TypeExpr ';'
 }
 
 concrete production nodeDecl
-d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr '{' b::Decls '}'
+d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::Expr ';'
 {
   d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, b.ast, location=d.location);
   d.ioOut = d.ioIn;
-    
-  b.ioIn = error("Use decl in body"); --TODO
-  b.currentDir = error("Use decl in body"); --TODO
-  b.parse = error("Use decl in body"); --TODO
 }
 
 concrete production nodeDeclNoBody
 d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::';'
 {
-  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, abs:nilDecl(), location=d.location);
+  d.ast =
+    abs:nodeDecl(
+      abs:name(n.lexeme, location=n.location),
+      p.ast,
+      mte.ast,
+      abs:declExpr(abs:nilDecl(), location=b.location), location=d.location);
   d.ioOut = d.ioIn;
 }
 
