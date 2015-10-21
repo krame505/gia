@@ -55,6 +55,13 @@ containsBy(f: (any, any) -> bool, x, items: any*): bool {
     else containsBy(f, x, tail(items));
 }
 
+range(lower : int, upper : int) : int* {
+  return
+    if lower >= upper
+    then []
+    else lower :: range(lower + 1, upper);
+}
+
 # Map
 datatype MapEntry = {key, value, eq: (any) -> bool}; # TODO: Fix bug with parameter type names missing
 datatype Map = {entries: MapEntry%, index: (any) -> any};
@@ -69,7 +76,7 @@ Map(ks, vs): Map {
   entries =
     if null(ks)
     then {}
-    else put(head(ks), head(vs), Map(tail(ks), tail(vs)).entries);
+    else put(head(ks), head(vs), Map(tail(ks), tail(vs)));
   index = fn(x)(get(x, self));
 }
 
@@ -88,4 +95,45 @@ contains(k, m: Map): bool {
 
 get(k, m: Map) {
   return m.entries[k].value.value;
+}
+
+# Pair
+# Note: This is going away eventually when there is a proper tuple extension
+datatype Pair = {fst, snd};
+Pair(fst, snd) : Pair {
+  fst = fst;
+  snd = snd;
+}
+
+fst(p : Pair) {
+  return p.fst;
+}
+
+snd(p : Pair) {
+  return p.snd;
+}
+
+# String
+implode(sep : str, list : str*) : str {
+  return
+    if null(list)
+    then ""
+    else if null(tail(list))
+    then head(list)
+    else head(list) + sep + implode(sep, tail(list));
+}
+
+explode(sep : str, s : str) : str* {
+  helper(index, matchIndex, between, match) {
+    return
+      if index == s.len
+      then [between + match]
+      else if matchIndex == sep.len
+      then between :: helper(index + 1, 0, s[index], "")
+      else if s[index] == (sep[matchIndex])
+      then helper(index + 1, matchIndex + 1, between, match + s[index])
+      else helper(index + 1, 0, between + match + s[index], "");
+  }
+  
+  return helper(0, 0, "", "");
 }
