@@ -11,9 +11,12 @@ type TypeDef = Def<Type>;
 
 autocopy attribute typeEnv::TypeEnv occurs on Decls, Decl, Params, Expr, Exprs, Name;
 synthesized attribute typeDefs::[TypeDef] occurs on Decls, Decl, Params;
+synthesized attribute typeRecDefs::[TypeDef] occurs on Decl;
 
 autocopy attribute typeNameEnv::TypeEnv occurs on Decls, Decl, Params, Expr, Exprs, Name;
+autocopy attribute typeNameExtendsEnv::TypeEnv occurs on Decl, Decls;
 synthesized attribute typeNameDefs::[TypeDef] occurs on Decls, Decl;
+synthesized attribute typeNameRecDefs::[TypeDef] occurs on Decl;
 
 nonterminal Type with pp;
 
@@ -189,7 +192,7 @@ Maybe<Type> ::= t1::Type t2::Type
       _, anyType() -> just(t1)
     | anyType(), _ -> just(t2)
     | dynamicType(), anyType() -> just(t2)
-    | _, namedType(n, t3) ->
+    | _, namedType(n, t3) -> 
       case convertType(t1, t3) of
         nothing() -> nothing()
       | just(t) -> just(namedType(n, t))
@@ -197,8 +200,16 @@ Maybe<Type> ::= t1::Type t2::Type
     | boolType(), boolType() -> just(t1)
     | intType(), intType() -> just(t1)
     | strType(), strType() -> just(t1)
-    | listType(s1), listType(s2) -> convertType(s1, s2)
-    | setType(s1), setType(s2) -> convertType(s1, s2)
+    | listType(s1), listType(s2) -> 
+      case convertType(s1, s2) of
+        just(t) -> just(listType(t))
+      | nothing() -> nothing()
+      end
+    | setType(s1), setType(s2) -> 
+      case convertType(s1, s2) of
+        just(t) -> just(setType(t))
+      | nothing() -> nothing()
+      end
     | functionType(p1, r1), functionType(p2, r2) ->
         case convertParams(p1, p2), convertType(r1, r2) of
           just(p), just(r) -> just(functionType(p, r))

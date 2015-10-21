@@ -8,9 +8,11 @@ d::Decls ::= h::Decl t::Decls
 {
   d.typeDefs = h.typeDefs ++ t.typeDefs;
   d.typeNameDefs = h.typeNameDefs ++ t.typeNameDefs;
-  --h.typeEnv = addEnv(d.typeDefs, d.typeEnv);
+  h.typeEnv = addEnv(h.typeNameRecDefs ++ t.typeDefs, d.typeEnv);
   t.typeEnv = addEnv(h.typeDefs, d.typeEnv);
+  h.typeNameEnv = addEnv(h.typeNameRecDefs ++ t.typeNameDefs, d.typeNameEnv);
   t.typeNameEnv = addEnv(h.typeNameDefs, d.typeNameEnv);
+  t.typeNameExtendsEnv = addEnv(h.typeNameDefs, d.typeNameExtendsEnv);
   d.ruleTypes = h.ruleTypes ++ t.ruleTypes;
   d.returnType = t.returnType;
 }
@@ -34,7 +36,9 @@ aspect production decls
 d::Decl ::= ds::Decls
 {
   d.typeDefs = ds.typeDefs;
+  d.typeRecDefs = [];
   d.typeNameDefs = ds.typeNameDefs;
+  d.typeNameRecDefs = [];
   d.ruleTypes = ds.ruleTypes;
 }
 
@@ -42,7 +46,9 @@ aspect production typeDecl
 d::Decl ::= n::Name te::TypeExpr
 {
   d.typeDefs = [];
+  d.typeRecDefs = [];
   d.typeNameDefs = [pair(n.name, te.type)];
+  d.typeNameRecDefs = [pair(n.name, anyType())];
   te.typeNameEnv = addEnv(d.typeNameDefs, d.typeNameEnv);
   d.ruleTypes = [];
 }
@@ -61,6 +67,7 @@ d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
     | _ -> [err(te.location, "Extended type in datatype declaration must be a datatype")]
     end;
   d.typeDefs = [];
+  d.typeRecDefs = [];
   d.typeNameDefs = 
     case te.type, extends.type of
       structureType(fields), dataType(n1, extendedFields) ->
@@ -68,17 +75,23 @@ d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
     | structureType(fields), _ -> [pair(n.name, dataType(n, fields))]
     | _, _ -> [pair(n.name, anyType())]
     end;
-  te.typeNameEnv = addEnv(d.typeNameDefs, d.typeNameEnv);
+  d.typeNameRecDefs = [pair(n.name, anyType())];
   d.ruleTypes = [];
+  extends.typeNameEnv = d.typeNameExtendsEnv;
 }
 
 aspect production valDecl
-d::Decl ::= n::Name te::TypeExpr e::Expr
+d::Decl ::= n::Name mte::MaybeTypeExpr e::Expr
 {
-  d.errors <- convertTypeExpectedErrors(e.type, te.type, "value declaration", d.location);
-  d.typeDefs = [pair(n.name, te.type)];--convertTypeOrAny(e.type, te.type)
+  d.errors <- convertTypeExpectedErrors(e.type, mte.type, "value declaration", d.location);
+  d.typeDefs = [pair(n.name, mte.type)];--convertTypeOrAny(e.type, te.type)
+  d.typeRecDefs =
+    if mte.isJust
+    then [pair(n.name, mte.type)]
+    else [pair(n.name, anyType())];
   d.typeNameDefs = [];
-  d.ruleTypes = [pair(n.name, te.type)];--convertTypeOrAny(e.type, te.type)
+  d.typeNameRecDefs = [];
+  d.ruleTypes = [pair(n.name, mte.type)];--convertTypeOrAny(e.type, te.type)
 }
 
 aspect production nodeDecl
@@ -86,7 +99,7 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
 {
   d.errors <- 
      case b.returnType of
-       just(t) -> convertTypeErrors(t, mte.type, "expected and actual return types", d.location)
+       just(t) -> convertTypeErrors(mte.type, t, "expected and actual return types", d.location)
      | nothing() ->
        if mte.isJust
        then
@@ -106,7 +119,12 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Decls
     else if b.returnType.isJust
     then [pair(n.name, functionType(p.types, b.returnType.fromJust))]
     else [pair(n.name, functionType(p.types, structureType(b.ruleTypes)))];
+  d.typeRecDefs =
+    if mte.isJust
+    then [pair(n.name, functionType(p.types, mte.type))]
+    else [pair(n.name, functionType(p.types, anyType()))];
   d.typeNameDefs = [];
+  d.typeNameRecDefs = [];
   
   -- Dummy values provided for error checking
   b.typeEnv =

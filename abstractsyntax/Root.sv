@@ -30,6 +30,7 @@ r::Root ::= d::Decls
   d.env = emptyEnv();
   d.typeEnv = emptyEnv();
   d.typeNameEnv = emptyEnv();
+  d.typeNameExtendsEnv = emptyEnv();
 }
 
 -- Don't know where to put this...

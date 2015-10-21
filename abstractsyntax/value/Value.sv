@@ -88,7 +88,9 @@ abstract production strValue
 v::Value ::= s::String
 {
   v.pp = text("\"" ++ s ++ "\"");
+  v.access = accessStr(s, _, _);
   v.type = strType();
+  v.index = indexStr(s, _, _);
   v.add = catStr(s, _, _);
   v.mul = repeatStr(s, _, _);
   v.eq = eqStr(s, _, _);
@@ -99,6 +101,7 @@ v::Value ::= contents::[Value]
 {
   v.pp = pp"[${ppImplode(text(", "), map((.pp), contents))}]";
   v.type = listType(foldr(mergeTypesOrDynamic, anyType(), map((.type), contents)));
+  v.access = accessList(contents, _, _);
   v.index = indexList(contents, _, _);
   v.add = catList(contents, _, _);
   v.eq = eqList(contents, _, _);
@@ -111,6 +114,7 @@ v::Value ::= contents::[Value]
 {
   v.pp = pp"{${ppImplode(text(", "), map((.pp), contents))}}";
   v.type = setType(foldr(mergeTypesOrDynamic, anyType(), map((.type), contents)));
+  v.access = accessSet(contents, _, _);
   v.index = indexSet(contents, _, _);
 --  v.add = unionSet(contents, _, _);
   v.sub = removeSet(contents, _, _);
@@ -128,13 +132,14 @@ v::Value ::= name::String env::ValueEnv params::[Type] ret::Type paramNames::[St
 }
 
 abstract production nodeValue
-v::Value ::= name::String datatypeName::Maybe<Name> children::[Value] bindings::[Pair<String Value>]
+v::Value ::= name::String type::Either<Type Maybe<Name>> children::[Value] bindings::[Pair<String Value>]
 {
   v.pp = pp"${text(name)}(${ppImplode(text(", "), map((.pp), children))})";
   v.type =
-    case datatypeName of
-      nothing() -> structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
-    | just(n) -> dataType(n, zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
+    case type of
+      left(t) -> t
+    | right(just(n)) -> dataType(n, zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
+    | right(nothing()) -> structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
     end;
   v.access = access(bindings, _, _);
   v.eq = eqNode(name, children, bindings, _, _);
@@ -161,7 +166,7 @@ v::Value ::=  env::ValueEnv typeNameEnv::TypeEnv expr::Expr
 abstract production errorValue
 v::Value ::= msgs::[Message]
 {
-  v.pp = text(implode("\n", map((.message), msgs)));
+  v.pp = text(implode("\n", map((.output), msgs)));
   v.eq = binaryIdentity(v, _, _);
 }
 
@@ -287,6 +292,30 @@ Value ::= i::Integer v::Value loc::Location
     end;
 }
 
+function accessStr
+Value ::= s::String field::Name loc::Location
+{
+  return
+    case field.name of
+      "len" -> intValue(length(s))
+    | "length" -> intValue(length(s))
+    | _ -> errorValue([err(loc, s"String does not have field ${field.name}")])
+    end;
+}
+
+function indexStr
+Value ::= s::String v::Value loc::Location
+{
+  return
+    case v of
+      intValue(i) ->
+        if i >= length(s)
+        then errorValue([err(loc, s"String index out of bounds: ${toString(i)}")])
+        else strValue(substring(i, i + 1, s))
+    | _ -> opError("[]", strValue(s), v, loc)
+    end;
+}
+
 function catStr
 Value ::= s::String v::Value loc::Location
 {
@@ -318,6 +347,17 @@ Value ::= s::String v::Value loc::Location
     case v of
       strValue(t) -> if s == t then trueValue() else falseValue()
     | _ -> opError("==", strValue(s), v, loc)
+    end;
+}
+
+function accessList
+Value ::= l::[Value] field::Name loc::Location
+{
+  return
+    case field.name of
+      "len" -> intValue(length(l))
+    | "length" -> intValue(length(l))
+    | _ -> errorValue([err(loc, s"List does not have field ${field.name}")])
     end;
 }
 
@@ -367,6 +407,17 @@ Value ::= l::[Value] v::Value loc::Location
     | _, listValue([]) -> falseValue()
     | [], listValue(_) -> falseValue()
     | _, _ -> opError("==", listValue(l), v, loc)
+    end;
+}
+
+function accessSet
+Value ::= l::[Value] field::Name loc::Location
+{
+  return
+    case field.name of
+      "len" -> intValue(length(l))
+    | "length" -> intValue(length(l))
+    | _ -> errorValue([err(loc, s"Set does not have field ${field.name}")])
     end;
 }
 
@@ -478,7 +529,7 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
     case lookup, v of
       functionValue(_, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(n1, _, l1, _) -> if n == n1 then eqList(l, listValue(l1), loc) else falseValue()
-    | _, _ -> opError("==", nodeValue(n, nothing(), l, []), v, loc)
+    | _, _ -> opError("==", nodeValue(n, right(nothing()), l, []), v, loc)
     end;
 }
 
@@ -520,7 +571,7 @@ Value ::= v::Value
   return
     nodeValue(
       "Some",
-      just(name("Maybe", location=bogusLocation)),
+      right(just(name("Maybe", location=bogusLocation))),
       [v],
       [pair("hasValue", trueValue()),
        pair("value", v)]);
@@ -532,7 +583,7 @@ Value ::=
   return
     nodeValue(
       "None",
-      just(name("Maybe", location=bogusLocation)),
+      right(just(name("Maybe", location=bogusLocation))),
       [],
       [pair("hasValue", falseValue()),
        pair("value", errorValue([err(bogusLocation, "Demanded value from None")]))]);

@@ -28,6 +28,8 @@ And(a: BoolExpr, b: BoolExpr): BoolExpr {
     then False()
     else if b.isTrue == False()
     then False()
+    else if a.isTrue == !b.isTrue
+    then False()
     else And(a.isTrue, b.isTrue);
   and = fn(b) (And(b, isTrue).isTrue);
   or = fn(b) (Or(b, isTrue).isTrue);
@@ -47,6 +49,8 @@ Or(a: BoolExpr, b: BoolExpr): BoolExpr {
     then b.isTrue
     else if b.isTrue == False()
     then a.isTrue
+    else if a.isTrue == !b.isTrue
+    then True()
     else Or(a.isTrue, b.isTrue);
   and = fn(b) (And(b, isTrue).isTrue);
   or = fn(b) (Or(b, isTrue).isTrue);
@@ -80,7 +84,7 @@ isTrue(expr: BoolExpr) {
   matchOr = expr ~ Or(@_, @_);
   matchNot = expr ~ Not(@_);
   matchVar = expr ~ Var(@_);
-  return
+  return 
     (expr ~ True()).hasValue |
     matchAnd.hasValue & isTrue(matchAnd.value[0]) & isTrue(matchAnd.value[1]) |
     matchOr.hasValue & (isTrue(matchOr.value[0]) | isTrue(matchOr.value[1])) |

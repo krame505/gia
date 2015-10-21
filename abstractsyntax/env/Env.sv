@@ -19,6 +19,12 @@ Env<a> ::= d::[Def<a>] e::Env<a>
   return tm:add(d, e);
 }
 
+function addBackEnv
+Env<a> ::= d::[Def<a>] e::Env<a>
+{
+  return tm:add(tm:toList(e) ++ d, emptyEnv());
+}
+
 function lookup
 [a] ::= n::String e::Env<a>
 {

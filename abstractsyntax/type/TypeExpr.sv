@@ -68,7 +68,7 @@ te::TypeExpr ::= fields::[Pair<String TypeExpr>]
 abstract production functionTypeExpr
 te::TypeExpr ::= params::[TypeExpr] ret::TypeExpr
 {
-  local paramTypeExprs::[Decorated TypeExpr] = map(decorateTypeExpr(te.typeNameEnv, te.typeEnv, _), params); -- TODO: Fix missing type name bug
+  local paramTypeExprs::[Decorated TypeExpr] = map(decorateTypeExpr(te.typeEnv, te.typeNameEnv, _), params); -- TODO: Fix missing type name bug
   te.errors := ret.errors ++ foldr(append, [], map((.errors), paramTypeExprs));
   te.type = functionType(map((.type), paramTypeExprs), ret.type);
 }
@@ -96,7 +96,23 @@ function pairMap
     then []
     else fn(head(l1), head(l2)) :: pairMap(fn, tail(l1), tail(l2)); 
 }
+{-
+nonterminal TypeExprs with typeEnv, typeNameEnv, errors, types, location;
 
+abstract production consTypeExpr
+tes::TypeExprs ::= h::TypeExpr t::TypeExprs
+{
+  tes.errors := h.errors ++ t.errors;
+  tes.types = h.type :: t.types;
+}
+
+abstract production nilTypeExpr
+te::TypeExprs ::= 
+{
+  te.errors := [];
+  te.types = [];
+}
+-}
 nonterminal MaybeTypeExpr with typeEnv, typeNameEnv, errors, type, isJust, location;
 
 abstract production justTypeExpr

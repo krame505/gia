@@ -138,6 +138,7 @@ e::Expr ::= f::Expr args::Exprs
     end;
   body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
   body.typeNameEnv = e.typeNameEnv; -- Need for run-time type checking
+  body.typeNameExtendsEnv = e.typeNameEnv; -- Need for run-time type checking
   body.env =
     case f.value of
       val:functionValue(n, env, params, _, paramNames, _) -> 
@@ -158,8 +159,8 @@ e::Expr ::= f::Expr args::Exprs
           just(v) -> v
         | _ -> 
           case f.value.type of
-            functionType(_, dataType(dt, _)) -> val:nodeValue(n, just(dt), args.values, body.defs)
-          | _ -> val:nodeValue(n, nothing(), args.values, body.defs)
+            functionType(_, t) -> val:nodeValue(n, left(t), args.values, body.defs)
+          | _ -> val:nodeValue(n, right(nothing()), args.values, body.defs)
           end
         end
     end
@@ -251,6 +252,50 @@ e::Expr ::= e1::Expr e2::Expr
   e.patternErrors := [err(e.location, "== cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("=="), e2.pp]);
   e.value = e1.value.val:eq(e2.value, e.location);
+}
+
+abstract production neqOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.patternErrors := [err(e.location, "!= cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("!="), e2.pp]);
+  forwards to notOp(eqOp(e1, e2, location=e.location), location=bogusLocation);
+}
+
+abstract production gtOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, "> cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text(">"), e2.pp]);
+  e.value = e1.value.val:gt(e2.value, e.location);
+}
+
+abstract production ltOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.patternErrors := [err(e.location, "< cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("<"), e2.pp]);
+  forwards to notOp(gteOp(e1, e2, location=e.location), location=bogusLocation);
+}
+
+abstract production gteOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.errors := e1.errors ++ e2.errors;
+  e.patternErrors := [err(e.location, ">= cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text(">="), e2.pp]);
+  local v1::Value = e1.value;
+  local v2::Value = e2.value;
+  e.value = v1.val:gt(v2, e.location).or(v1.val:eq(v2, e.location), bogusLocation);
+}
+
+abstract production lteOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.patternErrors := [err(e.location, "<= cannot occur in pattern expression")];
+  e.pp = concat([e1.pp, text("<="), e2.pp]);
+  forwards to notOp(gtOp(e1, e2, location=e.location), location=bogusLocation);
 }
 
 abstract production andOp

@@ -94,13 +94,14 @@ function paramErrors
         [err(loc, s"Invalid type for parameter ${toString(index)} in function call (expected ${show(80, p.pp)}, got ${show(80, a.pp)})")]
       end ++ paramErrors(params, args, index + 1, loc)
     | _, _ ->
-      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index)})")]
+      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index - 1)})")]
     end;
 }
 
 aspect production lambdaExpr
 e::Expr ::= params::Params body::Expr
 {
+  body.typeEnv = addEnv(params.typeDefs, e.typeEnv);
   e.type = functionType(params.types, body.type);
 }
 
@@ -138,6 +139,20 @@ aspect production eqOp
 e::Expr ::= e1::Expr e2::Expr
 {
   --e.errors <- mergeTypesErrors(e1.type, e2.type, "==", e.location);
+  e.type = boolType();
+}
+
+-- TODO: Type check overload is boolean
+aspect production gtOp
+e::Expr ::= e1::Expr e2::Expr
+{
+  e.type = boolType();
+}
+
+-- TODO: Type check overload is boolean
+aspect production gteOp
+e::Expr ::= e1::Expr e2::Expr
+{
   e.type = boolType();
 }
 
@@ -193,7 +208,7 @@ e::Expr ::= e1::Expr n::Name
         | nothing() -> [err(e1.location, s"Value of type ${show(80, e1.type.pp)} does not have field ${n.name}")]
         end
     | anyType() -> []
-    | _ -> [err(e1.location, s"Value of type ${show(80, e1.type.pp)} does not have fields")]
+    | _ -> []--[err(e1.location, s"Value of type ${show(80, e1.type.pp)} does not have fields")]
     end;
   e.type =
     case e1.type of
@@ -258,11 +273,7 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
       just(_) -> []
     | nothing() -> [err(el.location, s"Then and else types must be compatible (got ${show(80, th.type.pp)} and ${show(80, el.type.pp)})")]
     end;
-  e.type =
-    case mergeTypes(th.type, el.type) of
-      just(t) -> t
-    | _ -> anyType()
-    end;
+  e.type = mergeTypesOrAny(th.type, el.type);
 }
 
 aspect production constructList
@@ -282,6 +293,7 @@ e::Expr ::= ds::Decls e1::Expr
 {
   e1.typeEnv = addEnv(ds.typeDefs, e.typeEnv);
   e1.typeNameEnv = addEnv(ds.typeNameDefs, e.typeNameEnv);
+  ds.typeNameExtendsEnv = e.typeNameEnv;
   
   e.type = e1.type;
 }

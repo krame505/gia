@@ -78,6 +78,31 @@ concrete productions e::Expr
     e.ast = abs:eqOp(e1.ast, e2.ast, location=e.location);
     e.pp = concat([e1.pp, text("=="), e2.pp]);
   }
+| e1::Expr '!=' e2::Expr
+  {
+    e.ast = abs:neqOp(e1.ast, e2.ast, location=e.location);
+    e.pp = concat([e1.pp, text("!="), e2.pp]);
+  }
+| e1::Expr '>' e2::Expr
+  {
+    e.ast = abs:gtOp(e1.ast, e2.ast, location=e.location);
+    e.pp = concat([e1.pp, text(">"), e2.pp]);
+  }
+| e1::Expr '<' e2::Expr
+  {
+    e.ast = abs:ltOp(e1.ast, e2.ast, location=e.location);
+    e.pp = concat([e1.pp, text("<"), e2.pp]);
+  }
+| e1::Expr '>=' e2::Expr
+  {
+    e.ast = abs:gteOp(e1.ast, e2.ast, location=e.location);
+    e.pp = concat([e1.pp, text(">="), e2.pp]);
+  }
+| e1::Expr '<=' e2::Expr
+  {
+    e.ast = abs:lteOp(e1.ast, e2.ast, location=e.location);
+    e.pp = concat([e1.pp, text("<="), e2.pp]);
+  }
 | e1::Expr '&' e2::Expr
   {
     e.ast = abs:andOp(e1.ast, e2.ast, location=e.location);

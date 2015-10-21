@@ -55,7 +55,7 @@ terminal Semi_t       ';';
 terminal LParen_t     '(';
 terminal LALParen_t   /\(/ precedence = 10, association = left; -- Function calls
 terminal RParen_t     ')'  precedence = 1,  association = left; -- evidently, part of dangling-else?
-terminal LALBracket_t /\[/ association = left;
+terminal LALBracket_t /\[/ precedence = 10, association = left;
 terminal LBracket_t   '[';
 terminal RBracket_t   ']';
 terminal LCurly_t     '{';

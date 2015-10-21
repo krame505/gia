@@ -68,7 +68,7 @@ d::Decl ::= 'use' s::StringConstant_t ';'
 concrete production valDecl
 d::Decl ::= n::Id_t mte::MaybeTypeExpr '=' e::Expr ';'
 {
-  d.ast = abs:valDecl(abs:name(n.lexeme, location=n.location), mte.astOrAny, e.ast, location=d.location);
+  d.ast = abs:valDecl(abs:name(n.lexeme, location=n.location), mte.ast, e.ast, location=d.location);
   d.ioOut = d.ioIn;
 }
 
