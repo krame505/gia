@@ -73,7 +73,7 @@ do
                 ;;
             *)
                 case $@ in
-                    type*\;|datatype*\;|*\})
+                    type*\;|datatype*\;)
                         OLD_DECL_LIST=$DECL_LIST
                         DECL_LIST+="$@"
                         run_gia "\"OK\"" || DECL_LIST=$OLD_DECL_LIST

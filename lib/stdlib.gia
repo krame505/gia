@@ -7,34 +7,30 @@ Some(x): Maybe {
   hasValue = true;
   value = x;
   cond = true;
-}
+};
 
 None(): Maybe {
   hasValue = false;
   value = error("Demanded value from None");
   cond = false;
-}
+};
 
 # List
 null(l: any*): bool {
   return !(l ~ (_ :: _)).hasValue;
-}
+};
 
-head(l: any*): any {
-  return if null(l) then error("Head called on null list") else l[0];
-}
+head(l: any*): any
+  if null(l) then error("Head called on null list") else l[0];
 
-tail(l: any*): any* {
-  return if null(l) then error("Tail called on null list") else (l ~ (_ :: @_)).value[0];
-}
+tail(l: any*): any*
+  if null(l) then error("Tail called on null list") else (l ~ (_ :: @_)).value[0];
 
 # Util functions
-map(f: (any) -> any, items: any*): any* {
-  return
-    if null(items)
-    then []
-    else f(head(items)) :: map(f, tail(items));
-}
+map(f: (any) -> any, items: any*): any*
+  if null(items)
+  then []
+  else f(head(items)) :: map(f, tail(items));
 
 filter(f: (any) -> bool, items: any*): any* {
   rest = filter(f, tail(items));
@@ -44,23 +40,19 @@ filter(f: (any) -> bool, items: any*): any* {
     else if f(head(items))
     then head(items) :: rest
     else rest;
-}
+};
 
-containsBy(f: (any, any) -> bool, x, items: any*): bool {
-  return
-    if null(items)
-    then false
-    else if f(head(items), x)
-    then true
-    else containsBy(f, x, tail(items));
-}
+containsBy(f: (any, any) -> bool, x, items: any*): bool
+  if null(items)
+  then false
+  else if f(head(items), x)
+  then true
+  else containsBy(f, x, tail(items));
 
-range(lower : int, upper : int) : int* {
-  return
-    if lower >= upper
-    then []
-    else lower :: range(lower + 1, upper);
-}
+range(lower : int, upper : int) : int*
+  if lower >= upper
+  then []
+  else lower :: range(lower + 1, upper);
 
 # Map
 datatype MapEntry = {key, value, eq: (any) -> bool}; # TODO: Fix bug with parameter type names missing
@@ -70,7 +62,7 @@ MapEntry(k, v): MapEntry {
   key = k;
   value = v;
   eq = fn(other) (other == key);
-}
+};
 
 Map(ks, vs): Map {
   entries =
@@ -78,24 +70,21 @@ Map(ks, vs): Map {
     then {}
     else put(head(ks), head(vs), Map(tail(ks), tail(vs)));
   index = fn(x)(get(x, self));
-}
+};
 
 MapFromSet(s): Map {
   entries = s;
   index = fn(x)(get(x, self));
-}
+};
 
-put(k, v, m: Map): Map {
-  return MapFromSet({MapEntry(k, v)} | m.entries);
-}
+put(k, v, m: Map)
+  MapFromSet({(MapEntry(k, v))} | m.entries);
 
-contains(k, m: Map): bool {
-  return m.entries[k].value.hasValue;
-}
+contains(k, m: Map) : bool
+  m.entries[k].value.hasValue;
 
-get(k, m: Map) {
-  return m.entries[k].value.value;
-}
+get(k, m: Map)
+  m.entries[k].value.value;
 
 # Pair
 # Note: This is going away eventually when there is a proper tuple extension
@@ -103,37 +92,29 @@ datatype Pair = {fst, snd};
 Pair(fst, snd) : Pair {
   fst = fst;
   snd = snd;
-}
+};
 
-fst(p : Pair) {
-  return p.fst;
-}
+fst(p : Pair) p.fst;
 
-snd(p : Pair) {
-  return p.snd;
-}
+snd(p : Pair) p.snd;
 
 # String
-implode(sep : str, list : str*) : str {
-  return
-    if null(list)
-    then ""
-    else if null(tail(list))
-    then head(list)
-    else head(list) + sep + implode(sep, tail(list));
-}
+implode(sep : str, list : str*) : str
+  if null(list)
+  then ""
+  else if null(tail(list))
+  then head(list)
+  else head(list) + sep + implode(sep, tail(list));
 
 explode(sep : str, s : str) : str* {
-  helper(index, matchIndex, between, match) {
-    return
-      if index == s.len
-      then [between + match]
-      else if matchIndex == sep.len
-      then between :: helper(index + 1, 0, s[index], "")
-      else if s[index] == (sep[matchIndex])
-      then helper(index + 1, matchIndex + 1, between, match + s[index])
-      else helper(index + 1, 0, between + match + s[index], "");
-  }
+  helper(index, matchIndex, between, match)
+    if index == s.len
+    then [between + match]
+    else if matchIndex == sep.len
+    then between :: helper(index + 1, 0, s[index], "")
+    else if s[index] == (sep[matchIndex])
+    then helper(index + 1, matchIndex + 1, between, match + s[index])
+    else helper(index + 1, 0, between + match + s[index], "");
   
   return helper(0, 0, "", "");
-}
+};
