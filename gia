@@ -38,7 +38,7 @@ function run_gia {
         LOAD_SCRIPT+="use \"$FILE\"; "
     done
 
-    java -jar $JAR_NAME "$LOAD_SCRIPT $DECL_LIST" "User input" $@
+    java -jar $JAR_NAME "$LOAD_SCRIPT $DECL_LIST" "User input" "$@"
 }
 
 run_gia "\"Loaded\""
@@ -47,8 +47,9 @@ while read -e -p '(gia) ' LINE
 do
     if [[ ! -z ${LINE// /} ]]
     then
-        set $LINE
-        case $1 in
+        COMMAND=$(echo $LINE | cut -d " " -f 1)
+        ARGS=$(echo "$LINE" | awk '{ for (i=2; i<NF; i++) printf $i" " ; print $NF }')
+        case $COMMAND in
             "exit")
                 exit 0
                 ;;
@@ -69,29 +70,26 @@ do
                 fi
                 ;;
             "shell")
-                ${@:2}
+                $ARGS
                 ;;
             *)
-                case $@ in
-                    type*\;|datatype*\;)
-                        OLD_DECL_LIST=$DECL_LIST
-                        DECL_LIST+="$@"
-                        run_gia "\"OK\"" || DECL_LIST=$OLD_DECL_LIST
-                        ;;
-                    *\;)
-                        TXT="$@"
-                        VAR1=${TXT%\=*}
-                        VAR2=${VAR1%:*}
-                        VAR=`xargs <<<$VAR2`
-                        OLD_DECL_LIST=$DECL_LIST
-                        DECL_LIST+="$@"
-                        RESULT=$(run_gia "$VAR") && echo "$VAR = $RESULT" || (DECL_LIST=$OLD_DECL_LIST; echo -e "$RESULT")
-                        ;;
-                    *)
-                        run_gia $@
-                        ;;
-                esac
-                ;;
+                if [[ $LINE =~ (^[ ]*[a-zA-Z][a-zA-Z0-9_]*[ ]*=.*;[ ]*$) ]]
+                then
+                    TXT="$LINE"
+                    VAR1=${TXT%\=*}
+                    VAR2=${VAR1%:*}
+                    VAR=`xargs <<<$VAR2`
+                    OLD_DECL_LIST=$DECL_LIST
+                    DECL_LIST+="$@"
+                    RESULT=$(run_gia "$VAR") && echo "$VAR = $RESULT" || (DECL_LIST=$OLD_DECL_LIST; echo -e "$RESULT")
+                elif [[ $LINE =~ (;[ ]*$) ]]
+                then
+                    OLD_DECL_LIST=$DECL_LIST
+                    DECL_LIST+="$LINE"
+                    run_gia "\"OK\"" || DECL_LIST=$OLD_DECL_LIST
+                else
+                    run_gia "$LINE"
+                fi
         esac
     fi
     history -s "$LINE"
