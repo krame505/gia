@@ -10,7 +10,7 @@ d::Decls ::= h::Decl t::Decls
   t.ioIn = h.ioOut;
   d.ioOut = t.ioOut;
 }
-
+{-
 concrete production oneDecl
 d::Decls ::= h::Decl
 {
@@ -18,7 +18,7 @@ d::Decls ::= h::Decl
   h.ioIn = d.ioIn;
   d.ioOut = h.ioOut;
 }
-
+-}
 concrete production returnDecl
 d::Decls ::= 'return' e::Expr ';'
 {
@@ -26,14 +26,12 @@ d::Decls ::= 'return' e::Expr ';'
   d.ioOut = d.ioIn;
 }
 
-{- Not allowed due to parse conflict with empty set
 concrete production nilDecl
 d::Decls ::= 
 {
   d.ast = abs:nilDecl();
   d.ioOut = d.ioIn;
 }
--}
 
 abstract production parseErrorDecls
 d::Decls ::= errorTxt::String

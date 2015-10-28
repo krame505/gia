@@ -54,6 +54,9 @@ range(lower : int, upper : int) : int*
   then []
   else lower :: range(lower + 1, upper);
 
+# Set
+inSet(x, s : any%) s == (s | set {x});
+
 # Map
 datatype MapEntry = {key, value, eq: (any) -> bool}; # TODO: Fix bug with parameter type names missing
 datatype Map = {entries: MapEntry%, index: (any) -> any};
@@ -67,7 +70,7 @@ MapEntry(k, v): MapEntry {
 Map(ks, vs): Map {
   entries =
     if null(ks)
-    then {}
+    then set {}
     else put(head(ks), head(vs), Map(tail(ks), tail(vs)));
   index = fn(x)(get(x, self));
 };
@@ -78,9 +81,9 @@ MapFromSet(s): Map {
 };
 
 put(k, v, m: Map)
-  MapFromSet({(MapEntry(k, v))} | m.entries);
+  MapFromSet(set {(MapEntry(k, v))} | m.entries);
 
-contains(k, m: Map) : bool
+inMap(k, m: Map) : bool
   m.entries[k].value.hasValue;
 
 get(k, m: Map)
@@ -99,6 +102,8 @@ fst(p : Pair) p.fst;
 snd(p : Pair) p.snd;
 
 # String
+toStr(x) x.show;
+
 implode(sep : str, list : str*) : str
   if null(list)
   then ""

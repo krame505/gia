@@ -35,13 +35,13 @@ terminal Wildcard_t '_'        lexer classes {Keyword};
 terminal True_t     'true'     lexer classes {Keyword};
 terminal False_t    'false'    lexer classes {Keyword};
 terminal Error_t    'error'    lexer classes {Keyword};
+terminal Set_t      'set'      lexer classes {Keyword};
 terminal Return_t   'return'   lexer classes {Keyword};
 terminal Extends_t  'extends'  lexer classes {Keyword};
 terminal Lambda_t   'fn'       lexer classes {Keyword};
 terminal If_t       'if'       lexer classes {Keyword};
 terminal Then_t     'then'     lexer classes {Keyword};
 terminal Else_t     'else'     lexer classes {Keyword}, precedence = 0, association = left;
-terminal Let_t      'let'      lexer classes {Keyword};
 terminal In_t       'in'       lexer classes {Keyword}, precedence = 0, association = left;
 
 terminal Any_t     'any'     lexer classes {Keyword};
@@ -62,11 +62,6 @@ terminal LCurly_t     '{';
 terminal RCurly_t     '}';
 terminal Colon_t      ':';
 terminal Assign_t     '='  lexer classes {Symbol};
-
--- TODO, temporary hack, means no function calls inside set creation (?)
-disambiguate LParen_t, LALParen_t {
-  pluck LParen_t;
-}
 
 -- Operators
 terminal Cons_t     '::' precedence = 1, association = right, lexer classes {Symbol};

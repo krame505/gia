@@ -143,7 +143,7 @@ concrete productions e::Expr
     e.ast = abs:constructList(el.ast, location=e.location);
     e.pp = concat([text("["), el.pp, text("]")]);
   }
-| '{' el::Exprs '}'
+| 'set' '{' el::Exprs '}'
   {
     e.ast = abs:constructSet(el.ast, location=e.location);
     e.pp = concat([text("{"), el.pp, text("}")]);
