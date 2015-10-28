@@ -43,7 +43,7 @@ v::Value ::=
   v.or = opError("|", v, _, _);
   v.not = unaryOpError("!", v, _);
   v.cond = unaryOpError("if", v, _);
-  v.access = nameOpError(".", v, _, _);
+  v.access = accessDefault(v, _, _);
 }
 
 abstract production trueValue
@@ -140,7 +140,7 @@ v::Value ::= name::String type::Either<Type Name> children::[Value] bindings::[P
       left(t) -> t
     | right(n) -> dataType(n, zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
     end;
-  v.access = access(bindings, _, _);
+  v.access = accessNode(name, type, children, bindings, _, _);
   v.eq = eqNode(name, children, bindings, _, _);
   v.add = nodeOp("add", bindings, _, _);
   v.sub = nodeOp("sub", bindings, _, _);
@@ -156,7 +156,10 @@ v::Value ::= name::String type::Either<Type Name> children::[Value] bindings::[P
 abstract production structureValue
 v::Value ::= bindings::[Pair<String Value>]
 {
-  v.pp = pp"{${ppImplode(text(", "), map((bindingPP), bindings))}}";
+  v.pp =
+    if null(bindings)
+    then text("{}")
+    else pp"{${ppImplode(text("; "), map((bindingPP), bindings))};}";
   v.type = structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))));
   v.access = access(bindings, _, _);
   v.eq = eqStructure(bindings, _, _);
@@ -178,10 +181,14 @@ Document ::= b::Pair<String Value>
 }
 
 abstract production lazyValue
-v::Value ::=  env::ValueEnv typeNameEnv::TypeEnv expr::Expr
+v::Value ::= env::ValueEnv typeNameEnv::TypeEnv expr::Expr
 {
+  {-v.pp =
+    if length(show(80, expr.pp)) > 10
+    then pp"<lazy ...>"
+    else pp"<lazy ${expr.pp}>";-}
   expr.env = env;
-  expr.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
+  expr.typeEnv = emptyEnv(); --TODO: Find bad dependency, temporary hack to avoid crashing
   expr.typeNameEnv = typeNameEnv; -- Needed for run-time type checking
   forwards to expr.value;
 }
@@ -321,8 +328,7 @@ Value ::= s::String field::Name loc::Location
   return
     case field.name of
       "len" -> intValue(length(s))
-    | "length" -> intValue(length(s))
-    | _ -> errorValue([err(loc, s"String does not have field ${field.name}")])
+    | _ -> accessDefault(strValue(s), field, loc)
     end;
 }
 
@@ -356,9 +362,11 @@ Value ::= s::String v::Value loc::Location
   return
     case v of
       intValue(j) ->
-        case repeatStr(s, intValue(j - 1), loc) of
-          strValue(s1) -> strValue(s ++ s1)
-        end
+        if j > 0
+        then case repeatStr(s, intValue(j - 1), loc) of
+            strValue(s1) -> strValue(s ++ s1)
+          end
+        else strValue("")
     | _ -> opError("+", strValue(s), v, loc)
     end;
 }
@@ -379,8 +387,7 @@ Value ::= l::[Value] field::Name loc::Location
   return
     case field.name of
       "len" -> intValue(length(l))
-    | "length" -> intValue(length(l))
-    | _ -> errorValue([err(loc, s"List does not have field ${field.name}")])
+    | _ -> accessDefault(listValue(l), field, loc)
     end;
 }
 
@@ -439,8 +446,7 @@ Value ::= l::[Value] field::Name loc::Location
   return
     case field.name of
       "len" -> intValue(length(l))
-    | "length" -> intValue(length(l))
-    | _ -> errorValue([err(loc, s"Set does not have field ${field.name}")])
+    | _ -> accessDefault(setValue(l), field, loc)
     end;
 }
 
@@ -505,16 +511,53 @@ Boolean ::= b1::Boolean b2::Boolean
   return b1 && b2;
 }
 
+function accessDefault
+Value ::= v::Value field::Name loc::Location
+{
+  return
+    case field.name of
+      "toStr" -> strValue(show(80, v.pp))
+    | "pp" -> strValue(show(80, v.pp))
+    | "internal_debug_hackUnparse" -> strValue(hackUnparse(v))
+    | _ -> nameOpError(".", v, field, loc)
+    end;
+}
+
 function access
 Value ::= bindings::[Pair<String Value>] field::Name loc::Location
+{
+  return accessHelp(bindings, bindings, field, loc);
+}
+
+function accessHelp
+Value ::= bindings::[Pair<String Value>] oldBindings::[Pair<String Value>] field::Name loc::Location
 {
   return
     case bindings of
       pair(s, v) :: rest -> 
         if s == field.name
         then v
-        else access(rest, field, loc)
-    | [] -> errorValue([err(loc, s"Value does not have field ${field.name}")])
+        else accessHelp(rest, oldBindings, field, loc)
+    | [] -> accessDefault(structureValue(oldBindings), field, loc)
+    end;
+}
+
+function accessNode
+Value ::= name::String type::Either<Type Name> children::[Value] bindings::[Pair<String Value>] field::Name loc::Location
+{
+  return accessNodeHelp(name, type, children, bindings, bindings, field, loc);
+}
+
+function accessNodeHelp
+Value ::= name::String type::Either<Type Name> children::[Value] bindings::[Pair<String Value>] oldBindings::[Pair<String Value>] field::Name loc::Location
+{
+  return
+    case bindings of
+      pair(s, v) :: rest -> 
+        if s == field.name
+        then v
+        else accessHelp(rest, oldBindings, field, loc)
+    | [] -> accessDefault(nodeValue(name, type, children, oldBindings), field, loc)
     end;
 }
 
@@ -556,7 +599,7 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
       then eqList(l, listValue(l1), loc)
       else falseValue()
     | _, structureValue(fields) ->
-      if foldr(boolAnd, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
+      if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
       else falseValue()
     | _, _ -> opError("==", nodeValue(n, right(name(n, location=bogusLocation)), l, []), v, loc)
@@ -571,21 +614,15 @@ Value ::= bindings::[Pair<String Value>] v::Value loc::Location
     case lookup, v of
       functionValue(_, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(_, _, _, fields) ->
-      if foldr(boolAnd, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
+      if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
       else falseValue()
     | _, structureValue(fields) ->
-      if foldr(boolAnd, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
+      if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
       else falseValue()
     | _, _ -> opError("==", structureValue(bindings), v, loc)
     end;
-}
-
-function boolAnd
-Boolean ::= b1::Boolean b2::Boolean
-{
-  return b1 && b2;
 }
 
 function nameOpError
