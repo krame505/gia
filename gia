@@ -75,13 +75,9 @@ do
             *)
                 if [[ $LINE =~ (^[ ]*[a-zA-Z][a-zA-Z0-9_]*[ ]*=.*;[ ]*$) ]]
                 then
-                    TXT="$LINE"
-                    VAR1=${TXT%\=*}
-                    VAR2=${VAR1%:*}
-                    VAR=`xargs <<<$VAR2`
                     OLD_DECL_LIST=$DECL_LIST
-                    DECL_LIST+="$@"
-                    RESULT=$(run_gia "$VAR") && echo "$VAR = $RESULT" || (DECL_LIST=$OLD_DECL_LIST; echo -e "$RESULT")
+                    DECL_LIST+="$LINE"
+                    RESULT=$(run_gia "$COMMAND") && echo "$COMMAND = $RESULT" || (DECL_LIST=$OLD_DECL_LIST; echo -e "$RESULT")
                 elif [[ $LINE =~ (;[ ]*$) ]]
                 then
                     OLD_DECL_LIST=$DECL_LIST
