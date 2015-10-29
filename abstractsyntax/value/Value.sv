@@ -13,6 +13,7 @@ type ValueDef = Def<Value>;
 autocopy attribute env::ValueEnv;
 synthesized attribute defs::[ValueDef];
 
+synthesized attribute toStr::Document; -- Additional non-overidable pp attribute
 synthesized attribute index::(Value ::= Value Location);
 synthesized attribute add::(Value ::= Value Location);
 synthesized attribute sub::(Value ::= Value Location);
@@ -26,11 +27,12 @@ synthesized attribute not::(Value ::= Location);
 synthesized attribute cond::(Value ::= Location);
 synthesized attribute access::(Value ::= Name Location);
 
-nonterminal Value with pp, type, index, add, sub, mul, div, eq, gt, and, or, not, cond, access;
+nonterminal Value with pp, toStr, type, index, add, sub, mul, div, eq, gt, and, or, not, cond, access;
 
 aspect default production
 v::Value ::= 
 {
+  v.toStr = v.pp;
   v.type = anyType();
   v.index = opError("[]", v, _, _);
   v.add = opError("+", v, _, _);
@@ -100,6 +102,7 @@ abstract production listValue
 v::Value ::= contents::[Value]
 {
   v.pp = pp"[${ppImplode(text(", "), map((.pp), contents))}]";
+  v.toStr = pp"[${ppImplode(text(", "), map((.toStr), contents))}]";
   v.type = listType(foldr(mergeTypesOrDynamic, anyType(), map((.type), contents)));
   v.access = accessList(contents, _, _);
   v.index = indexList(contents, _, _);
@@ -113,6 +116,7 @@ abstract production setValue
 v::Value ::= contents::[Value]
 {
   v.pp = pp"{${ppImplode(text(", "), map((.pp), contents))}}";
+  v.toStr = pp"set {${ppImplode(text(", "), map((.toStr), contents))}}";
   v.type = setType(foldr(mergeTypesOrDynamic, anyType(), map((.type), contents)));
   v.access = accessSet(contents, _, _);
   v.index = indexSet(contents, _, _);
@@ -125,7 +129,7 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::ValueEnv params::[Type] ret::Type paramNames::[String] body::Expr
+v::Value ::= name::String env::ValueEnv tenv::TypeEnv params::[Type] ret::Type paramNames::[String] body::Expr
 {
   v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params))})";
   v.type = functionType(params, ret);
@@ -134,7 +138,14 @@ v::Value ::= name::String env::ValueEnv params::[Type] ret::Type paramNames::[St
 abstract production nodeValue
 v::Value ::= name::String type::Either<Type Name> children::[Value] bindings::[Pair<String Value>]
 {
-  v.pp = pp"${text(name)}(${ppImplode(text(", "), map((.pp), children))})";
+  local ppLookupRes::Maybe<Value> = lookupList("pp", bindings);
+  v.pp =
+    case ppLookupRes of
+      just(strValue(s)) -> text(s)
+    | just(_) -> errorValue([err(bogusLocation, "pp must be a string")]).toStr -- TODO: Fix missing location
+    | nothing() -> pp"${text(name)}(${ppImplode(text(", "), map((.pp), children))})"
+    end;
+  v.toStr = pp"${text(name)}(${ppImplode(text(", "), map((.toStr), children))})";
   v.type =
     case type of
       left(t) -> t
@@ -160,6 +171,10 @@ v::Value ::= bindings::[Pair<String Value>]
     if null(bindings)
     then text("{}")
     else pp"{${ppImplode(text("; "), map((bindingPP), bindings))};}";
+  v.toStr =
+    if null(bindings)
+    then text("{}")
+    else pp"{${ppImplode(text("; "), map((bindingToStr), bindings))};}";
   v.type = structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))));
   v.access = access(bindings, _, _);
   v.eq = eqStructure(bindings, _, _);
@@ -178,6 +193,12 @@ function bindingPP
 Document ::= b::Pair<String Value>
 {
   return pp"${text(b.fst)} = ${b.snd.pp}";
+}
+
+function bindingToStr
+Document ::= b::Pair<String Value>
+{
+  return pp"${text(b.fst)} = ${b.snd.toStr}";
 }
 
 abstract production lazyValue
@@ -516,7 +537,7 @@ Value ::= v::Value field::Name loc::Location
 {
   return
     case field.name of
-      "toStr" -> strValue(show(80, v.pp))
+      "toStr" -> strValue(show(80, v.toStr))
     | "pp" -> strValue(show(80, v.pp))
     | "internal_debug_hackUnparse" -> strValue(hackUnparse(v))
     | _ -> nameOpError(".", v, field, loc)
@@ -576,7 +597,7 @@ Value ::= op::String bindings::[Pair<String Value>] v::Value loc::Location
   return
     case v, lookup of
       errorValue(_), _ -> v
-    | _, functionValue(_, _, _, _, _, _) -> res.value
+    | _, functionValue(_, _, _, _, _, _, _) -> res.value
     | _, _ -> lookup -- TODO: Better error message
     end;
 }
@@ -593,7 +614,7 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(n1, _, l1, _) ->
       if n == n1
       then eqList(l, listValue(l1), loc)
@@ -612,7 +633,7 @@ Value ::= bindings::[Pair<String Value>] v::Value loc::Location
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(_, _, _, fields) ->
       if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
@@ -660,25 +681,71 @@ Value ::= op::String v::Value loc::Location
 function constructSome
 Value ::= v::Value
 {
-  return
+  local result::Value =
     nodeValue(
       "Some",
       right(name("Maybe", location=bogusLocation)),
       [v],
       [pair("hasValue", trueValue()),
-       pair("value", v)]);
+       pair("value", v),
+       pair("cond", trueValue()),
+       pair(
+         "and",
+         functionValue(
+           "<builtin lambda and Maybe>",
+           emptyEnv(),
+           emptyEnv(),
+           [anyType()],
+           anyType(),
+           ["m"],
+           nameLiteral(name("m", location=bogusLocation), location=bogusLocation))),
+       pair(
+         "or",
+         functionValue(
+           "<builtin lambda>",
+           emptyEnv(),
+           emptyEnv(),
+           [anyType()],
+           anyType(),
+           ["m"],
+           valueExpr(result, location=bogusLocation))),
+       pair("not", falseValue())]);
+  return result;
 }
 
 function constructNone
 Value ::= 
 {
-  return
+  local result::Value = 
     nodeValue(
       "None",
       right(name("Maybe", location=bogusLocation)),
       [],
       [pair("hasValue", falseValue()),
-       pair("value", errorValue([err(bogusLocation, "Demanded value from None")]))]);
+       pair("value", errorValue([err(bogusLocation, "Demanded value from None")])),
+       pair("cond", falseValue()),
+       pair(
+         "and",
+         functionValue(
+           "<builtin lambda>",
+           emptyEnv(),
+           emptyEnv(),
+           [anyType()],
+           anyType(),
+           ["m"],
+           falseLiteral(location=bogusLocation))),
+       pair(
+         "or",
+         functionValue(
+           "<builtin lambda>",
+           emptyEnv(),
+           emptyEnv(),
+           [anyType()],
+           anyType(),
+           ["m"],
+           nameLiteral(name("m", location=bogusLocation), location=bogusLocation))),
+       pair("not", trueValue())]);
+  return result;
 }
 
 function eqValue

@@ -1,18 +1,24 @@
 # gia standard util
 
 # Maybe
-datatype Maybe = {hasValue: bool, value, cond: bool};
+datatype Maybe = {hasValue: bool, value, cond: bool, and: (any) -> any, or: (any) -> any, not: bool};
 
 Some(x): Maybe {
   hasValue = true;
   value = x;
   cond = true;
+  and = fn(m) (m);
+  or = fn(m) (self);
+  not = false;
 };
 
 None(): Maybe {
   hasValue = false;
   value = error("Demanded value from None");
   cond = false;
+  and = fn(m) (false);
+  or = fn(m) (m);
+  not = true;
 };
 
 # List
@@ -102,7 +108,8 @@ fst(p : Pair) p.fst;
 snd(p : Pair) p.snd;
 
 # String
-toStr(x) x.show;
+toStr(x) x.toStr;
+pp(x) x.pp;
 
 implode(sep : str, list : str*) : str
   if null(list)
