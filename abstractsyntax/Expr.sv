@@ -1,11 +1,12 @@
 grammar gia:abstractsyntax;
 
 synthesized attribute patternErrors::[Message] with ++;
+synthesized attribute freeVars::[Name];
 synthesized attribute value::val:Value;
 inherited attribute matchValue::val:Value;
 synthesized attribute matchRes::val:Value;
 
-nonterminal Expr with val:env, errors, patternErrors, pp, value, matchValue, matchRes, location;
+nonterminal Expr with val:env, errors, patternErrors, pp, freeVars, value, matchValue, matchRes, location;
 
 aspect default production
 e::Expr ::=
@@ -19,6 +20,7 @@ e::Expr ::= v::val:Value
 {
   e.errors := [];
   e.pp = text("<value>");
+  e.freeVars = [];
   e.value = v;
   e.matchRes = error("Matching on valueExpr");
 }
@@ -28,6 +30,7 @@ e::Expr ::= e1::Expr
 {
   e.errors := e1.errors;
   e.pp = pp"error(${e1.pp})";
+  e.freeVars = e1.freeVars;
   e.value =
     case e1.value of
       val:strValue(s) -> val:errorValue([err(e.location, s)])
@@ -41,6 +44,7 @@ e::Expr ::=
 {
   e.errors := [];
   e.pp = text("true");
+  e.freeVars = [];
   e.value = val:trueValue();
   e.matchRes = 
     case e.matchValue of
@@ -54,6 +58,7 @@ e::Expr ::=
 {
   e.errors := [];
   e.pp = text("false");
+  e.freeVars = [];
   e.value = val:falseValue();
   e.matchRes = 
     case e.matchValue of
@@ -67,6 +72,7 @@ e::Expr ::= i::Integer
 {
   e.errors := [];
   e.pp = text(toString(i));
+  e.freeVars = [];
   e.value = val:intValue(i);
   e.matchRes =
     case e.matchValue of
@@ -80,6 +86,7 @@ e::Expr ::= s::String
 {
   e.errors := [];
   e.pp = text("\"" ++ s ++ "\"");
+  e.freeVars = [];
   e.value = val:strValue(s);
   e.matchRes =
     case e.matchValue of
@@ -93,6 +100,7 @@ e::Expr ::=
 {
   e.errors := [err(e.location, "Wildcard cannot occur in non-pattern expression")];
   e.pp = text("_");
+  e.freeVars = [];
   e.value = error("Wildcard does not have a value");
   e.matchRes = val:constructSome(val:listValue([]));
 }
@@ -103,6 +111,7 @@ e::Expr ::= n::Name
   e.errors := n.lookupCheck;
   e.patternErrors := [err(e.location, "Name cannot occur in pattern expression")];
   e.pp = text(n.name);
+  e.freeVars = [n];
   e.value = n.lookup;
 }
 
@@ -112,6 +121,7 @@ e::Expr ::= e1::Expr
   e.errors := [err(e.location, "Capture cannot occur in non-pattern expression")];
   e.patternErrors := e1.patternErrors;
   e.pp = cat(text("@"), e1.pp);
+  e.freeVars = e1.freeVars;
   e.value = e1.value;
   e1.matchValue = e.matchValue;
   e.matchRes =
@@ -131,16 +141,20 @@ e::Expr ::= f::Expr args::Exprs
     | _ -> [err(f.location, "Constructor in match must be a name")]
     end ++ args.patternErrors;
   e.pp = concat([f.pp, text("("), args.pp, text(")")]);
+  e.freeVars = f.freeVars ++ args.freeVars;
   
   local body::Expr =
     case f.value of
-      val:functionValue(_, _, _, _, _, body) -> body
+      val:functionValue(_, _, _, _, _, _, body) -> body
     end;
-  body.typeEnv = error("Value should not depend on typeEnv"); -- TODO: Find bad dependency
-  body.typeNameEnv = e.typeNameEnv; -- Need for run-time type checking
+  body.typeEnv = 
+    case f.value of
+      val:functionValue(n, env, tenv, params, _, paramNames, _) -> tenv
+    end; -- TODO: Find bad dependency
+  body.typeNameEnv = e.typeNameEnv; -- Need for run-time type checking, TODO: Is scoping correct?
   body.env =
     case f.value of
-      val:functionValue(n, env, params, _, paramNames, _) -> 
+      val:functionValue(n, env, tenv, params, _, paramNames, _) -> 
         addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", lazyValue(e.env, e.typeNameEnv, e))], env)
     end;
   
@@ -153,7 +167,7 @@ e::Expr ::= f::Expr args::Exprs
   e.value =
     if null(argRuntimeErrors)
     then case f.value of
-      val:functionValue(n, env, _, ret, _, _) ->
+      val:functionValue(n, env, tenv, _, ret, _, _) ->
         case ret, body.value of
           dataType(_, _), structureValue(fields) -> val:nodeValue(n, left(ret), args.values, fields)
         | _, _ -> body.value
@@ -195,13 +209,14 @@ e::Expr ::= params::Params body::Expr
   e.errors := params.errors ++ body.errors;
   e.patternErrors := [err(e.location, "Lambda cannot occur in pattern expression")];
   e.pp = concat([text("fn (<params>)"), text("("), body.pp, text(")")]); -- TODO
+  e.freeVars = removeAllBy(nameEq, map(name(_, location=bogusLocation), map(fst, params.defs)), body.freeVars);
   
   -- Provide dummy values for checking the declaration for errors
   params.args = [];
   body.env = addEnv(params.defs, e.env);
   
   local id::String = toString(genInt());
-  e.value = val:functionValue(s"<lambda ${id}>", e.env, params.types, body.type, params.names, body);
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, e.typeEnv, params.types, body.type, params.names, body);
 }
 
 abstract production addOp
@@ -210,6 +225,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "+ cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("+"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:add(e2.value, e.location);
 }
 
@@ -219,6 +235,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "- cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("-"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:sub(e2.value, e.location);
 }
 
@@ -228,6 +245,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "* cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("*"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:mul(e2.value, e.location);
 }
 
@@ -237,6 +255,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "/ cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("/"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:div(e2.value, e.location);
 }
 
@@ -246,6 +265,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "== cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("=="), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:eq(e2.value, e.location);
 }
 
@@ -263,6 +283,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "> cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text(">"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:gt(e2.value, e.location);
 }
 
@@ -280,6 +301,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, ">= cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text(">="), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   local v1::Value = e1.value;
   local v2::Value = e2.value;
   e.value = v1.val:gt(v2, e.location).or(v1.val:eq(v2, e.location), bogusLocation);
@@ -299,6 +321,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := e1.patternErrors ++ e2.patternErrors;
   e.pp = concat([e1.pp, text("&"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:and(e2.value, e.location);
   e1.matchValue = e.matchValue;
   e2.matchValue = e.matchValue;
@@ -316,6 +339,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := e1.patternErrors ++ e2.patternErrors;
   e.pp = concat([e1.pp, text("|"), e2.pp]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   e.value = e1.value.val:or(e2.value, e.location);
   e1.matchValue = e.matchValue;
   e2.matchValue = e.matchValue;
@@ -332,6 +356,7 @@ e::Expr ::= e1::Expr
   e.errors := e1.errors;
   e.patternErrors := e1.patternErrors;
   e.pp = cat(text("!"), e1.pp);
+  e.freeVars = e1.freeVars;
   e.value = e1.value.not(e.location);
   e1.matchValue = e.matchValue;
   e.matchRes = 
@@ -347,6 +372,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.patternErrors;
   e.patternErrors := [err(e.location, "~ cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("~"), e2.pp]);
+  e.freeVars = e1.freeVars;
   e2.matchValue = e1.value;
   e.value = e2.matchRes;
 }
@@ -357,6 +383,7 @@ e::Expr ::= e1::Expr n::Name
   e.errors := e1.errors;
   e.patternErrors := [err(e.location, ". cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("."), text(n.name)]);
+  e.freeVars = e1.freeVars;
   e.value = e1.value.val:access(n, e.location);
 }
 
@@ -366,6 +393,7 @@ e::Expr ::= h::Expr t::Expr
   e.errors := h.errors ++ t.errors;
   e.patternErrors := h.patternErrors ++ t.patternErrors;
   e.pp = concat([h.pp, text("::"), t.pp]);
+  e.freeVars = h.freeVars ++ t.freeVars;
   
   e.value =
     case h.value, t.value of
@@ -405,6 +433,7 @@ e::Expr ::= e1::Expr e2::Expr
   e.errors := e1.errors ++ e2.errors;
   e.patternErrors := [err(e.location, "List index cannot occur in pattern expression")];
   e.pp = concat([e1.pp, text("["), e2.pp, text("]")]);
+  e.freeVars = e1.freeVars ++ e2.freeVars;
   
   e.value =
     case e1.value, e2.value of
@@ -420,6 +449,7 @@ e::Expr ::= cnd::Expr th::Expr el::Expr
   e.errors := cnd.errors ++ th.errors ++ el.errors;
   e.patternErrors := [err(e.location, "Conditional cannot occur in pattern expression")];
   e.pp = concat([text("if"), cnd.pp, text("then"), th.pp, text("else"), el.pp]);
+  e.freeVars = cnd.freeVars ++ th.freeVars ++ el.freeVars;
   
   e.value =
     case cnd.value of
@@ -439,8 +469,12 @@ e::Expr ::= el::Exprs
   e.errors := el.errors;
   e.patternErrors := el.patternErrors;
   e.pp = concat([text("["), el.pp, text("]")]);
+  e.freeVars = el.freeVars;
   
-  e.value = val:listValue(el.values);
+  e.value =
+    if !null(el.runtimeErrors)
+   	then errorValue(el.runtimeErrors)
+   	else val:listValue(el.values);
   
   el.matchValue =
     case e.matchValue of
@@ -456,8 +490,12 @@ e::Expr ::= el::Exprs
   e.errors := el.errors;
   e.patternErrors := [err(e.location, "Matching on sets is not yet implimented")];
   e.pp = concat([text("{"), el.pp, text("}")]);
+  e.freeVars = el.freeVars;
   
-  e.value = val:setValue(nubBy(val:eqValue, el.values));
+  e.value = 
+    if !null(el.runtimeErrors)
+   	then errorValue(el.runtimeErrors)
+   	else val:setValue(nubBy(val:eqValue, el.values));
 }
 
 abstract production declExpr
@@ -466,8 +504,9 @@ e::Expr ::= ds::Decls
   e.errors := ds.errors;
   e.patternErrors := [err(e.location, "Decls cannot occur in pattern expression")];
   e.pp = pp"{<decls>}"; -- TODO
+  e.freeVars = error("Not yet implimented");
   
-  e.value =
+  e.value = -- TODO, check if contains errors
     case ds.returnValue of
       just(v) -> v
     | _ ->
@@ -480,9 +519,10 @@ e::Expr ::= ds::Decls
 }
 
 synthesized attribute values::[val:Value];
+synthesized attribute runtimeErrors::[Message];
 synthesized attribute len::Integer;
 
-nonterminal Exprs with env, errors, patternErrors, pp, values, matchValue, matchRes, len;
+nonterminal Exprs with env, errors, patternErrors, pp, freeVars, runtimeErrors, values, matchValue, matchRes, len;
 
 abstract production consExpr
 e::Exprs ::= h::Expr t::Exprs
@@ -490,7 +530,13 @@ e::Exprs ::= h::Expr t::Exprs
   e.errors := h.errors ++ t.errors;
   e.patternErrors := h.patternErrors ++ t.patternErrors;
   e.pp = concat([h.pp, text(","), t.pp]);
+  e.freeVars = h.freeVars ++ t.freeVars;
   
+  e.runtimeErrors =
+    case h.value of
+      errorValue(e) -> e
+    | _ -> []
+    end ++ t.runtimeErrors;
   e.values = h.value :: t.values;
   h.matchValue =
     case e.matchValue of
@@ -517,6 +563,8 @@ e::Exprs ::=
   e.errors := [];
   e.patternErrors := [];
   e.pp = text("");
+  e.freeVars = [];
+  e.runtimeErrors = [];
   e.values = [];
   e.matchRes =
     case e.matchValue of

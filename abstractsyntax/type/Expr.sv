@@ -66,13 +66,13 @@ e::Expr ::= f::Expr args::Exprs
     case f.type of
       anyType() -> []
     | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
-    | _ -> [err(f.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
+    | _ -> [err(e.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
   e.patternErrors <- 
     case f.type of
       anyType() -> []
     | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
-    | _ -> [err(f.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
+    | _ -> [err(e.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
   e.type =
     case f.type of
@@ -94,7 +94,7 @@ function paramErrors
         [err(loc, s"Invalid type for parameter ${toString(index)} in function call (expected ${show(80, p.pp)}, got ${show(80, a.pp)})")]
       end ++ paramErrors(params, args, index + 1, loc)
     | _, _ ->
-      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index)})")]
+      [err(loc, s"Incorrect number of parameters in function call (expected ${toString(index + length(params) - 1)}, got ${toString(index + length(args) - 1)})")]
     end;
 }
 
@@ -195,7 +195,7 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production accessOp
 e::Expr ::= e1::Expr n::Name
 {
-  e.errors <-
+  e.errors <- if containsBy(stringEq, n.name, ["toStr", "pp", "len", "length", "internal_debug_hackUnparse"]) then [] else --TODO
     case e1.type of
       dataType(_, fields) ->
         case lookupList(n.name, fields) of

@@ -99,7 +99,12 @@ abstract production valDecl
 d::Decl ::= n::Name mte::MaybeTypeExpr e::Expr
 {
   d.errors := e.errors;
+  
+  local runtimeErrors::[Message] = convertTypeErrors(e.value.type, mte.type, "value declaration", d.location);
   d.defs = [pair(n.name, val:lazyValue(d.env, d.typeNameEnv, e))];
+    --if null(runtimeErrors)
+    --then [pair(n.name, val:lazyValue(d.env, d.typeNameEnv, e))]
+    --else [pair(n.name, val:errorValue(runtimeErrors))];
   d.rules = [pair(n.name, e)];
 }
 
@@ -107,7 +112,7 @@ abstract production nodeDecl
 d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
 {
   d.errors := p.errors ++ mte.errors ++ b.errors;
-  d.defs = [pair(n.name, val:functionValue(n.name, d.env, p.types, mte.type, p.names, b))];
+  d.defs = [pair(n.name, val:functionValue(n.name, d.env, d.typeEnv, p.types, mte.type, p.names, b))];
   d.rules = [pair(n.name, lambdaExpr(p, b, location=d.location))];
   
   -- Dummy values provided for error checking
