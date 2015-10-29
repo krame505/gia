@@ -1,6 +1,7 @@
-datatype BoolExpr = {isTrue: BoolExpr, and: (any) -> BoolExpr, or: (any) -> BoolExpr, not: BoolExpr, cond: bool}; # TODO: Fix bug with parameter type names missing
+datatype BoolExpr = {pp: str, isTrue: BoolExpr, and: (BoolExpr) -> BoolExpr, or: (BoolExpr) -> BoolExpr, not: BoolExpr, cond: bool};
 
 True(): BoolExpr {
+  pp = "T";
   isTrue = True();
   and = fn(b) (b);
   or = fn(b) (True());
@@ -9,6 +10,7 @@ True(): BoolExpr {
 };
 
 False(): BoolExpr {
+  pp = "F";
   isTrue = False();
   and = fn(b) (False());
   or = fn(b) (b);
@@ -17,6 +19,14 @@ False(): BoolExpr {
 };
 
 And(a: BoolExpr, b: BoolExpr): BoolExpr {
+  pp =
+    (if a ~ Or(_, _) | a ~ Not(_)
+     then "(" + a.pp + ")"
+     else a.pp) +
+    " & " +
+    (if b ~ Or(_, _)
+     then "(" + b.pp + ")"
+     else b.pp);
   isTrue =
     if a == b
     then a
@@ -38,6 +48,14 @@ And(a: BoolExpr, b: BoolExpr): BoolExpr {
 };
 
 Or(a: BoolExpr, b: BoolExpr): BoolExpr {
+  pp =
+    (if a ~ And(_, _) | a ~ Not(_)
+     then "(" + a.pp + ")"
+     else a.pp) +
+    " | " +
+    (if b ~ And(_, _)
+     then "(" + b.pp + ")"
+     else b.pp);
   isTrue =
     if a == b
     then a
@@ -59,6 +77,11 @@ Or(a: BoolExpr, b: BoolExpr): BoolExpr {
 };
 
 Not(a: BoolExpr): BoolExpr {
+  pp =
+    "!" +
+    (if a ~ And(_, _) | a ~ Not(_)
+     then "(" + a.pp + ")"
+     else a.pp);
   isTrue =
     if a.isTrue == True()
     then False()
@@ -72,6 +95,7 @@ Not(a: BoolExpr): BoolExpr {
 };
 
 Var(a): BoolExpr {
+  pp = a;
   isTrue = Var(a);
   and = fn(b) (And(b, isTrue).isTrue);
   or = fn(b) (Or(b, isTrue).isTrue);

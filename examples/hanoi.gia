@@ -1,0 +1,45 @@
+use "search.gia";
+
+datatype HanoiState extends State = {peg1 : int*, peg2 : int*, peg3 : int*};
+
+HanoiState(p1 : int*, p2 : int*, p3 : int*) : HanoiState {
+  peg1 = p1;
+  peg2 = p2;
+  peg3 = p3;
+  legalMove(p1 : int*, p2 : int*) {
+    return !null(p1) & (null(p2) | head(p1) < head(p2));
+  };
+  actions =
+    (if legalMove(peg1, peg2)
+     then [HanoiState(tail(peg1), head(peg1) :: peg2, peg3)]
+     else []) +
+    (if legalMove(peg1, peg3)
+     then [HanoiState(tail(peg1), peg2, head(peg1) :: peg3)]
+     else []) +
+    (if legalMove(peg2, peg1)
+     then [HanoiState(head(peg2) :: peg1, tail(peg2), peg3)]
+     else []) +
+    (if legalMove(peg2, peg3)
+     then [HanoiState(peg1, tail(peg2), head(peg2) :: peg3)]
+     else []) +
+    (if legalMove(peg3, peg1)
+     then [HanoiState(head(peg3) :: peg1, peg2, tail(peg3))]
+     else []) +
+    (if legalMove(peg3, peg2)
+     then [HanoiState(peg1, head(peg3) :: peg2, tail(peg3))]
+     else []);
+  done = null(p1) & null(p2);
+
+  pp =
+    implode("", map(toStr, peg1)) + " " +
+    implode("", map(toStr, peg2)) + " " +
+    implode("", map(toStr, peg3));
+    
+};
+
+datatype Hanoi extends Problem = {};
+
+Hanoi(size : int) : Hanoi {
+  initial = HanoiState(range(1, size + 1), [], []);
+  pp = initial.pp;
+};

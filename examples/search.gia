@@ -1,0 +1,65 @@
+# Collection of search algorithms
+
+datatype State   = {actions : State*, done : bool, pp : str};
+datatype Node    = {state : State, actions : State*, depth : int, path : State*, parent : Node?};
+datatype Problem = {initial : State, pp : str};
+
+Node(s : State, p : Node?) : Node {
+  state = s;
+  actions = state.actions;
+  parent = p;
+  path =
+    if parent
+    then parent.value.path + [state]
+    else [state];
+  depth =
+    if parent
+    then parent.value.depth + 1
+    else 1;
+};
+
+type SearchResult = {path : State*, depth : int, result : State};
+
+depth_first_search(p : Problem) : SearchResult? {
+  search(nodes, visited)
+    if null(nodes)
+    then None()
+    else if head(nodes).state.done
+    then Some(head(nodes))
+    else search(map(fn(state)(Node(state, Some(head(nodes)))),
+                    filter(fn(s)(!inSet(s, visited)),
+                           head(nodes).actions)) +
+                    tail(nodes),
+                visited | set {head(nodes).state});
+  res = search([Node(p.initial, None())], set {});
+  return
+    if res
+    then Some({
+        path = res.value.path;
+        depth = res.value.depth;
+        result = res.value.state;
+      })
+    else None();
+};
+
+breadth_first_search(p : Problem) : SearchResult? {
+  search(nodes, visited)
+    if null(nodes)
+    then None()
+    else if head(nodes).state.done
+    then Some(head(nodes))
+    else search(tail(nodes) +
+                map(fn(state)(Node(state, Some(head(nodes)))),
+                    filter(fn(s)(!inSet(s, visited)),
+                           head(nodes).actions)),
+                visited | set {head(nodes).state});
+  res = search([Node(p.initial, None())], set {});
+  return
+    if res
+    then Some({
+        path = res.value.path;
+        depth = res.value.depth;
+        result = res.value.state;
+      })
+    else None();
+};
