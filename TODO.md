@@ -1,5 +1,7 @@
 Near-term TODO items
 ====================
+* Lists have hd, tl, null, and cond attributes
+* Generic typing
 * Type-check overloaded operators
 * Fix hacks with resolving recursive typing
 * Fix bugs with run-time errors not being 'bubbled up' to the top level
@@ -10,7 +12,6 @@ Near-term TODO items
 Long-range TODO items
 =====================
 * IDE
-* Fix REPL environment
+* Improve/fix REPL environment
   * Use nailgun for speed-up
   * Bugs with syntax errors in decls kind of breaking the session
-* Generic typing?
