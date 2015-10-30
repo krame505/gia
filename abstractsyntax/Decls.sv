@@ -4,7 +4,7 @@ synthesized attribute rules::[Pair<String Expr>];
 synthesized attribute returnExpr::Maybe<Expr>;
 synthesized attribute returnValue::Maybe<Value>;
 
-nonterminal Decls with env, defs, errors, rules, returnExpr, returnValue, evalExpr, evalRes, evalResType, evalErrors;
+nonterminal Decls with env, nonRecEnv, defs, errors, rules, returnExpr, returnValue, evalExpr, evalRes, evalResType, evalErrors;
 
 abstract production consDecl
 d::Decls ::= h::Decl t::Decls
@@ -13,6 +13,7 @@ d::Decls ::= h::Decl t::Decls
   d.defs = h.defs ++ t.defs;
   h.env = addEnv(d.defs, d.env);
   t.env = addEnv(h.defs, d.env);
+  t.nonRecEnv = addEnv(h.defs, d.nonRecEnv);
   d.rules = h.rules ++ t.rules;
   d.returnExpr = t.returnExpr;
   d.returnValue = t.returnValue;
@@ -65,7 +66,7 @@ d::Decls ::= errorTxt::String
   forwards to nilDecl();
 }
 
-nonterminal Decl with env, defs, rules, errors, location;
+nonterminal Decl with env, nonRecEnv, defs, rules, errors, location;
 
 abstract production decls
 d::Decl ::= ds::Decls
@@ -73,6 +74,35 @@ d::Decl ::= ds::Decls
   d.errors := ds.errors;
   d.defs = ds.defs;
   d.rules = ds.rules;
+}
+
+abstract production openDecl
+d::Decl ::= e::Expr
+{
+  d.errors := e.errors;
+  e.env = d.nonRecEnv;
+  
+  forwards to
+    case e.value of
+      structureValue(ds) -> decls(convertValDecls(ds), location=d.location)
+    | nodeValue(_, _, _, ds) -> decls(convertValDecls(ds), location=d.location)
+    end
+  with {env = emptyEnv();};
+}
+
+function convertValDecls
+Decls ::= ds::[Pair<String Value>]
+{
+  return
+    if null(ds)
+    then nilDecl()
+    else
+      consDecl(
+        valDecl(
+          name(head(ds).fst, location=bogusLocation),
+          justTypeExpr(directTypeExpr(head(ds).snd.type, location=bogusLocation), location=bogusLocation),
+          valueExpr(head(ds).snd, location=bogusLocation), location=bogusLocation),
+        convertValDecls(tail(ds)));
 }
 
 abstract production typeDecl
@@ -86,11 +116,7 @@ d::Decl ::= n::Name te::TypeExpr
 abstract production dataTypeDecl
 d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
 {
-  d.errors :=
-    case te.type of
-      structureType(fields) -> []
-    | t -> [err(te.location, s"Type in datatype declaration must be a structure, but got ${show(80, t.pp)}")]
-    end ++ te.errors;
+  d.errors := te.errors;
   d.defs = [];
   d.rules = [];
 }

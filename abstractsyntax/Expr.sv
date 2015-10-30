@@ -516,6 +516,8 @@ e::Expr ::= ds::Decls
           map(fst, ds.rules),
           map(lazyValue(addEnv(ds.defs, e.env), addEnv(ds.typeNameDefs, e.typeNameEnv), _), map(snd, ds.rules))))
     end;
+  
+  ds.nonRecEnv = e.env;
 }
 
 synthesized attribute values::[val:Value];

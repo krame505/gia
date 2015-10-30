@@ -28,6 +28,7 @@ r::Root ::= d::Decls
   r.evalErrors = d.evalErrors;
   
   d.env = emptyEnv();
+  d.nonRecEnv = emptyEnv();
   d.typeEnv = emptyEnv();
   d.typeNameEnv = emptyEnv();
   d.typeNameExtendsEnv = emptyEnv();

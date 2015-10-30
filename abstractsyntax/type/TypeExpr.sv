@@ -80,6 +80,13 @@ te::TypeExpr ::= n::Name
   te.type = namedType(n, n.typeNameLookup);
 }
 
+abstract production directTypeExpr
+te::TypeExpr ::= t::Type
+{
+  te.errors := [];
+  te.type = t;
+}
+
 function decorateTypeExpr
 Decorated TypeExpr ::= typeEnv::TypeEnv typeNameEnv::TypeEnv te::TypeExpr
 {

@@ -29,6 +29,7 @@ terminal StringConstant_t /[\"]([^\"]|[\\][\"])*[\"]/ lexer classes {Literal};
 
 -- Keywords
 terminal Use_t      'use'      lexer classes {Keyword};
+terminal Open_t     'open'     lexer classes {Keyword};
 terminal Type_t     'type'     lexer classes {Keyword};
 terminal DataType_t 'datatype' lexer classes {Keyword};
 terminal Wildcard_t '_'        lexer classes {Keyword};

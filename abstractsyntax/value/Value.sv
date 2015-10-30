@@ -11,6 +11,7 @@ type ValueEnv = Env<Value>;
 type ValueDef = Def<Value>;
 
 autocopy attribute env::ValueEnv;
+autocopy attribute nonRecEnv::ValueEnv;
 synthesized attribute defs::[ValueDef];
 
 synthesized attribute toStr::Document; -- Additional non-overidable pp attribute

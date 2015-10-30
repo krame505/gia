@@ -59,7 +59,7 @@ d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
   d.errors <-
     case te.type of
       structureType(_) -> []
-    | _ -> [err(te.location, "Type expression in datatype declaration must be a structure")]
+    | t -> [err(te.location, s"Type in datatype declaration must be a structure, but got ${show(80, t.pp)}")]
     end ++ 
     case extends.type of
       anyType() -> [] -- Used as a dummy value to indicate no extends

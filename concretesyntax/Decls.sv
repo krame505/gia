@@ -73,6 +73,13 @@ d::Decl ::= 'use' s::StringConstant_t ';'
   cst.parse = d.parse;
 }
 
+concrete production openDecl
+d::Decl ::= 'open' e::Expr ';'
+{
+  d.ast = abs:openDecl(e.ast, location=d.location);
+  d.ioOut = d.ioIn;
+}
+
 concrete production valDecl
 d::Decl ::= n::Id_t mte::MaybeTypeExpr '=' e::Expr ';'
 {
