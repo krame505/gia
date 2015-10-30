@@ -87,6 +87,8 @@ Not(a: BoolExpr): BoolExpr {
     then False()
     else if a.isTrue == False()
     then True()
+    else if a ~ Not(_)
+    then (a ~ Not(@_)).value[0]
     else Not(a);
   and = fn(b) (And(b, isTrue).isTrue);
   or = fn(b) (Or(b, isTrue).isTrue);
