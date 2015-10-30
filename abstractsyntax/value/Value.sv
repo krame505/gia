@@ -409,6 +409,16 @@ Value ::= l::[Value] field::Name loc::Location
   return
     case field.name of
       "len" -> intValue(length(l))
+    | "cond" -> if !null(l) then trueValue() else falseValue()
+    | "null" -> if null(l) then trueValue() else falseValue()
+    | "hd" ->
+      if null(l)
+      then errorValue([err(loc, "Cannot find the head of a null list")])
+      else head(l)
+    | "tl" ->
+      if null(l)
+      then errorValue([err(loc, "Cannot find the tail of a null list")])
+      else listValue(tail(l))
     | _ -> accessDefault(listValue(l), field, loc)
     end;
 }

@@ -195,7 +195,7 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production accessOp
 e::Expr ::= e1::Expr n::Name
 {
-  e.errors <- if containsBy(stringEq, n.name, ["toStr", "pp", "len", "length", "internal_debug_hackUnparse"]) then [] else --TODO
+  e.errors <- if containsBy(stringEq, n.name, ["toStr", "pp", "len", "null", "hd", "tl", "internal_debug_hackUnparse"]) then [] else --TODO
     case e1.type of
       dataType(_, fields) ->
         case lookupList(n.name, fields) of

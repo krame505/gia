@@ -7,28 +7,28 @@ HanoiState(p1 : int*, p2 : int*, p3 : int*) : HanoiState {
   peg2 = p2;
   peg3 = p3;
   legalMove(p1 : int*, p2 : int*) {
-    return !null(p1) & (null(p2) | head(p1) < head(p2));
+    return !p1.null & (p2.null | p1.hd < p2.hd);
   };
   actions =
     (if legalMove(peg1, peg2)
-     then [HanoiState(tail(peg1), head(peg1) :: peg2, peg3)]
+     then [HanoiState(peg1.tl, peg1.hd :: peg2, peg3)]
      else []) +
     (if legalMove(peg1, peg3)
-     then [HanoiState(tail(peg1), peg2, head(peg1) :: peg3)]
+     then [HanoiState(peg1.tl, peg2, peg1.hd :: peg3)]
      else []) +
     (if legalMove(peg2, peg1)
-     then [HanoiState(head(peg2) :: peg1, tail(peg2), peg3)]
+     then [HanoiState(peg2.hd :: peg1, peg2.tl, peg3)]
      else []) +
     (if legalMove(peg2, peg3)
-     then [HanoiState(peg1, tail(peg2), head(peg2) :: peg3)]
+     then [HanoiState(peg1, peg2.tl, peg2.hd :: peg3)]
      else []) +
     (if legalMove(peg3, peg1)
-     then [HanoiState(head(peg3) :: peg1, peg2, tail(peg3))]
+     then [HanoiState(peg3.hd :: peg1, peg2, peg3.tl)]
      else []) +
     (if legalMove(peg3, peg2)
-     then [HanoiState(peg1, head(peg3) :: peg2, tail(peg3))]
+     then [HanoiState(peg1, peg3.hd :: peg2, peg3.tl)]
      else []);
-  done = null(p1) & null(p2);
+  done = p1.null & p2.null;
 
   pp =
     implode("", map(toStr, peg1)) + " " +

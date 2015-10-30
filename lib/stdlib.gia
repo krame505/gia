@@ -22,38 +22,25 @@ None(): Maybe {
 };
 
 # List
-null(l: any*): bool {
-  return !(l ~ (_ :: _)).hasValue;
-};
-
-head(l: any*): any
-  if null(l) then error("Head called on null list") else l[0];
-
-tail(l: any*): any*
-  if null(l) then error("Tail called on null list") else (l ~ (_ :: @_)).value[0];
 
 # Util functions
 map(f: (any) -> any, items: any*): any*
-  if null(items)
-  then []
-  else f(head(items)) :: map(f, tail(items));
+  if items
+  then f(items.hd) :: map(f, items.tl)
+  else [];
 
 filter(f: (any) -> bool, items: any*): any* {
-  rest = filter(f, tail(items));
+  rest = filter(f, items.tl);
   return
-    if null(items)
+    if items.null
     then []
-    else if f(head(items))
-    then head(items) :: rest
+    else if f(items.hd)
+    then items.hd :: rest
     else rest;
 };
 
 containsBy(f: (any, any) -> bool, x, items: any*): bool
-  if null(items)
-  then false
-  else if f(head(items), x)
-  then true
-  else containsBy(f, x, tail(items));
+  !items.null & (f(items.hd, x) | containsBy(f, x, items.tl));
 
 range(lower : int, upper : int) : int*
   if lower >= upper
@@ -75,9 +62,9 @@ MapEntry(k, v): MapEntry {
 
 Map(ks, vs): Map {
   entries =
-    if null(ks)
+    if ks.null
     then set {}
-    else put(head(ks), head(vs), Map(tail(ks), tail(vs)));
+    else put(ks.hd, vs.hd, Map(ks.tl, vs.tl));
   index = fn(x)(get(x, self));
 };
 
@@ -104,7 +91,6 @@ Pair(fst, snd) : Pair {
 };
 
 fst(p : Pair) p.fst;
-
 snd(p : Pair) p.snd;
 
 # String
@@ -112,11 +98,11 @@ toStr(x) x.toStr;
 pp(x) x.pp;
 
 implode(sep : str, list : str*) : str
-  if null(list)
+  if list.null
   then ""
-  else if null(tail(list))
-  then head(list)
-  else head(list) + sep + implode(sep, tail(list));
+  else if list.tl.null
+  then list.hd
+  else list.hd + sep + implode(sep, list.tl);
 
 explode(sep : str, s : str) : str* {
   helper(index, matchIndex, between, match)

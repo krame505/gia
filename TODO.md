@@ -1,6 +1,5 @@
 Near-term TODO items
 ====================
-* Lists have hd, tl, null, and cond attributes
 * Generic typing
 * Type-check overloaded operators
 * Fix hacks with resolving recursive typing
