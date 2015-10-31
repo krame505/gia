@@ -57,15 +57,15 @@ do
                 run_gia "\"Done\""
                 ;;
             "use")
-                if [ ! -f $2 ]
+                if [ ! -f $ARGS ]
                 then
-                    echo "File $2 not found"
-                elif [[ $LOAD_LIST == *$2* ]]
+                    echo "File $ARGS not found"
+                elif [[ $LOAD_LIST == *$ARGS* ]]
                 then
-                    echo "File $2 already loaded"
+                    echo "File $ARGS already loaded"
                 else
                     OLD_LOAD_LIST=$LOAD_LIST
-                    LOAD_LIST+=" $2"
+                    LOAD_LIST+=" $ARGS"
                     run_gia "\"Done\"" || LOAD_LIST=$OLD_LOAD_LIST
                 fi
                 ;;
