@@ -106,7 +106,7 @@ Decls ::= ds::[Pair<String Value>]
 }
 
 abstract production typeDecl
-d::Decl ::= n::Name te::TypeExpr
+d::Decl ::= n::Name gp::[Name] te::TypeExpr
 {
   d.errors := te.errors;
   d.defs = [];
@@ -114,7 +114,7 @@ d::Decl ::= n::Name te::TypeExpr
 }
 
 abstract production dataTypeDecl
-d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
+d::Decl ::= n::Name gp::[Name] te::TypeExpr extends::TypeExpr
 {
   d.errors := te.errors;
   d.defs = [];

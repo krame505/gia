@@ -53,10 +53,15 @@ concrete productions te::TypeExpr
     te.ast = abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=te.location);
     te.pp = text(n.lexeme);
   }
+| te1::TypeExpr '<' tes::TypeExprs '>'
+  {
+    te.ast = abs:genericAppTypeExpr(te1.ast, tes.ast, location=te.location);
+    te.pp = pp"${te1.pp}<${tes.pp}>";
+  }
 | '[' te1::TypeExpr ']'
   {
     te.ast = te1.ast;
-    te.pp = pp"(${te1.pp})";
+    te.pp = pp"[${te1.pp}]";
   }
 
 closed nonterminal TypeExprs with ast<[abs:TypeExpr]>, pp;

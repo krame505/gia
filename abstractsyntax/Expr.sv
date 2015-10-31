@@ -108,11 +108,14 @@ e::Expr ::=
 abstract production nameLiteral
 e::Expr ::= n::Name
 {
-  e.errors := n.lookupCheck;
+  e.errors := [];
   e.patternErrors := [err(e.location, "Name cannot occur in pattern expression")];
   e.pp = text(n.name);
   e.freeVars = [n];
-  e.value = n.lookup;
+  e.value =
+    if null(n.lookupCheck)
+    then n.lookup
+    else errorValue(n.lookupCheck);
 }
 
 abstract production capture

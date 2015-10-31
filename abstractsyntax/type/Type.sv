@@ -113,6 +113,20 @@ t::Type ::= n::Name t1::Type
   forwards to t1;
 }
 
+abstract production resolvedGenericType
+t::Type ::= old::Type args::[Type] resolved::Type
+{
+  t.pp = pp"${old.pp}<${ppImplode(text(", "), map((.pp), args))}>";
+  forwards to resolved;
+}
+
+abstract production genericType
+t::Type ::= te::TypeExpr params::[String] tenv::TypeEnv
+{
+  te.typeNameEnv = addEnv(zipWith(pair, params, repeat(anyType(), length(params))), tenv);
+  forwards to te.type;
+}
+
 function mergeTypesErrors
 [Message] ::= t1::Type t2::Type op::String loc::Location
 {

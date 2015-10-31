@@ -80,11 +80,52 @@ te::TypeExpr ::= n::Name
   te.type = namedType(n, n.typeNameLookup);
 }
 
+abstract production genericAppTypeExpr
+te::TypeExpr ::= te1::TypeExpr args::[TypeExpr]
+{
+  te.errors := 
+    case te1.type of
+      genericType(te, params, tenv) -> 
+        if length(args) == length(params)
+        then []
+        else [err(te.location, s"Wrong number of generic arguments (expected ${toString(length(params))}, got ${toString(length(args))})")]
+      | _ -> [err(te.location, "Type expression does not have generic parameters")]
+    end;
+  
+  local argTypeExprs::[Decorated TypeExpr] = map(decorateTypeExpr(te.typeEnv, te.typeNameEnv, _), args);
+  local base::TypeExpr = 
+    case te1.type of
+      genericType(te, params, tenv) -> te
+    end;
+  base.typeNameEnv = 
+    case te1.type of
+      genericType(te, params, tenv) -> addEnv(zipWith(pair, params, map((.type), argTypeExprs)), tenv)
+    end;
+  
+  te.type = resolvedGenericType(te1.type, map((.type), args), base.type);
+}
+
 abstract production directTypeExpr
 te::TypeExpr ::= t::Type
 {
   te.errors := [];
   te.type = t;
+}
+
+-- Only used in generic type reconstruction
+abstract production extendsTypeExpr
+te::TypeExpr ::= n::Name te1::TypeExpr
+{
+  te.errors := te1.errors;
+  te.type = extendsType(n, te1.type);
+}
+
+abstract production dataTypeExpr
+te::TypeExpr ::= n::Name fields::[Pair<String TypeExpr>]
+{
+  local fieldTypeExprs::[Decorated TypeExpr] = map(decorateTypeExpr(te.typeEnv, te.typeNameEnv, _), map(snd, fields));
+  te.errors := foldr(append, [], map((.errors), fieldTypeExprs));
+  te.type = dataType(n, pairMap(pair, map(fst, fields), map((.type), fieldTypeExprs)));
 }
 
 function decorateTypeExpr

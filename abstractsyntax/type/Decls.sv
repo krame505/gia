@@ -42,19 +42,47 @@ d::Decl ::= ds::Decls
   d.ruleTypes = ds.ruleTypes;
 }
 
+aspect production openDecl
+d::Decl ::= e::Expr
+{
+  d.errors <- 
+    case e.type of
+      structureType(_) -> []
+    | dataType(_, _) -> []
+    | _ -> [err(e.location, s"Open decl expression must have structure type, but found ${show(80, e.type.pp)}")]
+    end;
+  d.typeDefs =
+    case e.type of
+      structureType(ds) -> ds
+    | dataType(_, ds) -> ds
+    | _ -> []
+    end;
+  d.typeNameDefs = [];
+  d.typeNameRecDefs = [];
+  d.ruleTypes =
+    case e.type of
+      structureType(ds) -> ds
+    | dataType(_, ds) -> ds
+    | _ -> []
+    end;
+}
+
 aspect production typeDecl
-d::Decl ::= n::Name te::TypeExpr
+d::Decl ::= n::Name gp::[Name] te::TypeExpr
 {
   d.typeDefs = [];
   d.typeRecDefs = [];
-  d.typeNameDefs = [pair(n.name, te.type)];
+  d.typeNameDefs =
+    if null(gp)
+    then [pair(n.name, te.type)]
+    else [pair(n.name, genericType(te, map((.name), gp), te.typeNameEnv))];
   d.typeNameRecDefs = [pair(n.name, anyType())];
-  te.typeNameEnv = addEnv(d.typeNameDefs, d.typeNameEnv);
+  te.typeNameEnv = addEnv(d.typeNameDefs ++ zipWith(pair, map((.name), gp), repeat(anyType(), length(gp))), d.typeNameEnv);
   d.ruleTypes = [];
 }
 
 aspect production dataTypeDecl
-d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
+d::Decl ::= n::Name gp::[Name] te::TypeExpr extends::TypeExpr
 {
   d.errors <-
     case te.type of
@@ -69,13 +97,34 @@ d::Decl ::= n::Name te::TypeExpr extends::TypeExpr
   d.typeDefs = [];
   d.typeRecDefs = [];
   d.typeNameDefs = 
-    case te.type, extends.type of
-      structureType(fields), dataType(n1, extendedFields) ->
-        [pair(n.name, extendsType(n1, dataType(n, fields ++ extendedFields)))]
-    | structureType(fields), _ -> [pair(n.name, dataType(n, fields))]
-    | _, _ -> [pair(n.name, anyType())]
-    end;
+    if !null(gp)
+    then
+      case te, extends of
+        structureTypeExpr(fields), dataTypeExpr(n1, extendedFields) ->
+          [pair(
+             n.name,
+             genericType(
+               extendsTypeExpr(n1, dataTypeExpr(n, fields ++ extendedFields, location=te.location), location=extends.location),
+               map((.name), gp),
+               te.typeNameEnv))]
+      | structureTypeExpr(fields), _ ->
+          [pair(
+             n.name,
+             genericType(
+               dataTypeExpr(n, fields, location=te.location),
+               map((.name), gp),
+               te.typeNameEnv))]
+      | _, _ -> [pair(n.name, anyType())]
+      end
+    else
+      case te.type, extends.type of
+        structureType(fields), dataType(n1, extendedFields) ->
+          [pair(n.name, extendsType(n1, dataType(n, fields ++ extendedFields)))]
+      | structureType(fields), _ -> [pair(n.name, dataType(n, fields))]
+      | _, _ -> [pair(n.name, anyType())]
+      end;
   d.typeNameRecDefs = [pair(n.name, anyType())];
+  te.typeNameEnv = addEnv(d.typeNameDefs ++ zipWith(pair, map((.name), gp), repeat(anyType(), length(gp))), d.typeNameEnv);
   d.ruleTypes = [];
   extends.typeNameEnv = d.typeNameExtendsEnv;
 }

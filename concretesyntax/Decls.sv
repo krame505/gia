@@ -88,16 +88,16 @@ d::Decl ::= n::Id_t mte::MaybeTypeExpr '=' e::Expr ';'
 }
 
 concrete production typeDecl
-d::Decl ::= 'type' n::Id_t '=' te::TypeExpr ';'
+d::Decl ::= 'type' n::Id_t mgp::MaybeGenericParams '=' te::TypeExpr ';'
 {
-  d.ast = abs:typeDecl(abs:name(n.lexeme, location=n.location), te.ast, location=d.location);
+  d.ast = abs:typeDecl(abs:name(n.lexeme, location=n.location), mgp.ast, te.ast, location=d.location);
   d.ioOut = d.ioIn;
 }
 
 concrete production dataTypeDecl
-d::Decl ::= 'datatype' n::Id_t me::MaybeExtends '=' te::TypeExpr ';'
+d::Decl ::= 'datatype' n::Id_t mgp::MaybeGenericParams me::MaybeExtends '=' te::TypeExpr ';'
 {
-  d.ast = abs:dataTypeDecl(abs:name(n.lexeme, location=n.location), te.ast, me.ast, location=d.location);
+  d.ast = abs:dataTypeDecl(abs:name(n.lexeme, location=n.location), mgp.ast, te.ast, me.ast, location=d.location);
   d.ioOut = d.ioIn;
 }
 
@@ -141,6 +141,39 @@ concrete productions p::Params
     p.ast = abs:nilParam();
     p.fieldAst = [];
     p.pp = text("");
+  }
+
+closed nonterminal MaybeGenericParams with ast<[abs:Name]>, pp, location;
+
+concrete productions mgp::MaybeGenericParams
+| '<' gp::GenericParams '>'
+  {
+    mgp.ast = gp.ast;
+    mgp.pp = pp"<${gp.pp}>";
+  }
+|
+  {
+    mgp.ast = [];
+    mgp.pp = text("");
+  }
+
+closed nonterminal GenericParams with ast<[abs:Name]>, pp;
+
+concrete productions gp::GenericParams
+| h::Id_t ',' t::GenericParams
+  {
+    gp.ast = abs:name(h.lexeme, location=h.location) :: t.ast;
+    gp.pp = text(h.lexeme);
+  }
+| h::Id_t
+  {
+    gp.ast = [abs:name(h.lexeme, location=h.location)];
+    gp.pp = text(h.lexeme);
+  }
+|
+  {
+    gp.ast = [];
+    gp.pp = text("");
   }
 
 closed nonterminal MaybeExtends with ast<abs:TypeExpr>, pp, location;

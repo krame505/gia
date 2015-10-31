@@ -50,6 +50,7 @@ e::Expr ::=
 aspect production nameLiteral
 e::Expr ::= n::Name
 {
+  e.errors <- n.typeLookupCheck;
   e.type = n.typeLookup;
 }
 
