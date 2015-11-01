@@ -105,6 +105,9 @@ Var(a): BoolExpr {
   cond = error("Condition on Var");
 };
 
+T = True();
+F = False();
+
 isTrue(expr: BoolExpr) {
   matchAnd = expr ~ And(@_, @_);
   matchOr = expr ~ Or(@_, @_);
@@ -117,5 +120,6 @@ isTrue(expr: BoolExpr) {
     matchNot.hasValue & !isTrue(matchNot.value[0]);
 };
 
-test1 = And(Or(Not(Var("x")), False()), True());
-test2 = And(Or(Not(Var("x")), Var("x")), True());
+x = Var("x");
+test1 = (!x | F) & T; # And(Or(Not(Var("x")), False()), True())
+test2 = (!x | x) & T; # And(Or(Not(Var("x")), Var("x")), True())

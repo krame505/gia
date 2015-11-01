@@ -1,0 +1,4 @@
+datatype T = {a : T*};
+datatype T1 extends T = {};
+
+X() : T1 {a = [X(), X()];};
