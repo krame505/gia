@@ -1,6 +1,5 @@
 Near-term TODO items
 ====================
-* Generic typing
 * Type-check overloaded operators
 * Fix hacks with resolving recursive typing
 * Fix bugs with run-time errors not being 'bubbled up' to the top level
