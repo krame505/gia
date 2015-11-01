@@ -53,6 +53,11 @@ concrete productions te::TypeExpr
     te.ast = abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=te.location);
     te.pp = text(n.lexeme);
   }
+| Quote_t n::Id_t
+  {
+    te.ast = abs:genericVarTypeExpr(abs:name(n.lexeme, location=n.location), location=te.location);
+    te.pp = text("'" ++ n.lexeme);
+  }
 | te1::TypeExpr '<' tes::TypeExprs '>'
   {
     te.ast = abs:genericAppTypeExpr(te1.ast, tes.ast, location=te.location);
@@ -64,22 +69,22 @@ concrete productions te::TypeExpr
     te.pp = pp"[${te1.pp}]";
   }
 
-closed nonterminal TypeExprs with ast<[abs:TypeExpr]>, pp;
+closed nonterminal TypeExprs with ast<abs:TypeExprs>, pp;
 
 concrete productions tes::TypeExprs
 | h::TypeExpr ',' t::TypeExprs
   {
-    tes.ast = h.ast :: t.ast;
+    tes.ast = abs:consTypeExpr(h.ast, t.ast);
     tes.pp = concat([h.pp, text(","), t.pp]);
   }
 | h::TypeExpr
   {
-    tes.ast = [h.ast];
+    tes.ast = abs:consTypeExpr(h.ast, abs:nilTypeExpr());
     tes.pp = h.pp;
   }
 |
   {
-    tes.ast = [];
+    tes.ast = abs:nilTypeExpr();
     tes.pp = text("");
   }
 

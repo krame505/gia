@@ -203,7 +203,7 @@ Document ::= b::Pair<String Value>
 }
 
 abstract production lazyValue
-v::Value ::= env::ValueEnv typeNameEnv::TypeEnv expr::Expr
+v::Value ::= env::ValueEnv typeNameEnv::TypeEnv expr::Expr type::Type
 {
   {-v.pp =
     if length(show(80, expr.pp)) > 10
@@ -212,7 +212,12 @@ v::Value ::= env::ValueEnv typeNameEnv::TypeEnv expr::Expr
   expr.env = env;
   expr.typeEnv = emptyEnv(); --TODO: Find bad dependency, temporary hack to avoid crashing
   expr.typeNameEnv = typeNameEnv; -- Needed for run-time type checking
-  forwards to expr.value;
+  
+  local runtimeErrors::[Message] = convertTypeErrors(expr.value.type, type, "value declaration", expr.location);
+  forwards to
+    if null(runtimeErrors)
+    then expr.value
+    else errorValue(runtimeErrors);
 }
 
 abstract production errorValue

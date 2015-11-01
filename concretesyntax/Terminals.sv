@@ -88,3 +88,4 @@ terminal Dot_t      '.'  precedence = 9;
 -- Type operators
 terminal Arrow_t    '->'  precedence = 1, association = left, lexer classes {Symbol};
 terminal Question_t '?'   precedence = 2, association = left, lexer classes {Symbol};
+terminal Quote_t    /'/   lexer classes {Symbol};

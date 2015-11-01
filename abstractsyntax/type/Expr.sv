@@ -75,9 +75,26 @@ e::Expr ::= f::Expr args::Exprs
     | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
     | _ -> [err(e.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
+    
+  local genericParams::TypeExprs = 
+    case f.type of
+      functionTypeWithTE(_, _, _, params, ret) -> params
+    end;
+  genericParams.genericTestTypes = args.types;
+    
+  local genericRet::TypeExpr = 
+    case f.type of
+      functionTypeWithTE(_, _, _, params, ret) -> ret
+    end;
+  genericRet.typeNameEnv = 
+    case f.type of
+      functionTypeWithTE(_, _, tenv, _, _) -> addEnv(genericParams.genericTypeDefs, tenv)
+    end;
+    
   e.type =
     case f.type of
-      functionType(params, ret) -> ret
+      functionTypeWithTE(_, _, _, params, ret) -> genericRet.type
+    | functionType(params, ret) -> ret
     | _ -> anyType()
     end;
 }

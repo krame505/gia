@@ -126,11 +126,7 @@ d::Decl ::= n::Name mte::MaybeTypeExpr e::Expr
 {
   d.errors := e.errors;
   
-  local runtimeErrors::[Message] = convertTypeErrors(e.value.type, mte.type, "value declaration", d.location);
-  d.defs = [pair(n.name, val:lazyValue(d.env, d.typeNameEnv, e))];
-    --if null(runtimeErrors)
-    --then [pair(n.name, val:lazyValue(d.env, d.typeNameEnv, e))]
-    --else [pair(n.name, val:errorValue(runtimeErrors))];
+  d.defs = [pair(n.name, val:lazyValue(d.env, d.typeNameEnv, e, mte.type))];
   d.rules = [pair(n.name, e)];
 }
 

@@ -3,6 +3,7 @@ grammar gia:abstractsyntax:env;
 imports gia:abstractsyntax;
 
 imports silver:util:raw:treemap as tm;
+imports silver:langutil:pp;
 
 type Env<a> = tm:Map<String a>;
 type Def<a> = Pair<String a>;
@@ -42,4 +43,16 @@ Maybe<a> ::= n::String e::[Pair<String a>]
       then just(h)
       else lookupList(n, t)
     end;
+}
+
+function typeDefsToString
+String ::= ds::[Def<Type>]
+{
+  return implode(", ", map(typeDefToString, ds));
+}
+
+function typeDefToString
+String ::= d::Def<Type>
+{
+  return s"${d.fst}: ${show(80, d.snd.pp)}";
 }

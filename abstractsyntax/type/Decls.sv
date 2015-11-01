@@ -104,7 +104,7 @@ d::Decl ::= n::Name gp::[Name] te::TypeExpr extends::TypeExpr
           [pair(
              n.name,
              genericType(
-               extendsTypeExpr(n1, dataTypeExpr(n, fields ++ extendedFields, location=te.location), location=extends.location),
+               extendsTypeExpr(n1, dataTypeExpr(n, appFields(fields, extendedFields), location=te.location), location=extends.location),
                map((.name), gp),
                te.typeNameEnv))]
       | structureTypeExpr(fields), _ ->
@@ -157,14 +157,19 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
      end;
   d.typeDefs =
     if mte.isJust
-    then [pair(n.name, functionType(p.types, mte.type))]
-    else [pair(n.name, functionType(p.types, b.type))];
+    then [pair(n.name, functionTypeWithTE(p.types, mte.type, d.typeNameEnv, p.typeExprs, mte.typeExprOrAny))]
+    else [pair(n.name, functionTypeWithTE(p.types, b.type, d.typeNameEnv, p.typeExprs, mte.typeExprOrAny))];
   d.typeRecDefs =
     if mte.isJust
     then [pair(n.name, functionType(p.types, mte.type))]
     else [pair(n.name, functionType(p.types, anyType()))];
   d.typeNameDefs = [];
   d.typeNameRecDefs = [];
+  
+  local genericParams::TypeExprs = p.typeExprs;
+  genericParams.genericTestTypes = repeat(anyType(), p.len);
+  p.typeNameEnv = addEnv(genericParams.genericTypeDefs, d.typeNameEnv);
+  mte.typeNameEnv = addEnv(genericParams.genericTypeDefs, d.typeNameEnv);
   
   -- Dummy values provided for error checking
   b.typeEnv =
@@ -175,12 +180,15 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
   d.ruleTypes = [pair(n.name, anyType())];--e.type
 }
 
+synthesized attribute typeExprs::TypeExprs occurs on Params;
+
 aspect production consParam
 p::Params ::= h::Name mte::MaybeTypeExpr t::Params
 {
   p.errors <- mte.errors;
   p.typeDefs = pair(h.name, mte.type) :: t.typeDefs; -- TODO: Typed params
   p.types = mte.type :: t.types;
+  p.typeExprs = consTypeExpr(mte.typeExprOrAny, t.typeExprs);
 }
 
 aspect production nilParam
@@ -188,4 +196,5 @@ p::Params ::=
 {
   p.typeDefs = [];
   p.types = [];
+  p.typeExprs = nilTypeExpr();
 }

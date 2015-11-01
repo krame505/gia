@@ -120,26 +120,26 @@ d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::';'
   d.ioOut = d.ioIn;
 }
 
-synthesized attribute fieldAst::[Pair<String abs:TypeExpr>];
+synthesized attribute fieldAst::abs:Fields;
 closed nonterminal Params with ast<abs:Params>, fieldAst, pp, location;
 
 concrete productions p::Params
 | h::Id_t mte::MaybeTypeExpr ',' t::Params
   {
     p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), mte.ast, t.ast);
-    p.fieldAst = pair(h.lexeme, mte.astOrAny) :: t.fieldAst;
+    p.fieldAst = abs:consFields(h.lexeme, mte.astOrAny, t.fieldAst);
     p.pp = pp"${text(h.lexeme)}${mte.pp}, ${t.pp}";
   }
 | h::Id_t mte::MaybeTypeExpr
   {
     p.ast = abs:consParam(abs:name(h.lexeme, location=h.location), mte.ast, abs:nilParam());
-    p.fieldAst = [pair(h.lexeme, mte.astOrAny)];
+    p.fieldAst = abs:consFields(h.lexeme, mte.astOrAny, abs:nilFields());
     p.pp = cat(text(h.lexeme), mte.pp);
   }
 |
   {
     p.ast = abs:nilParam();
-    p.fieldAst = [];
+    p.fieldAst = abs:nilFields();
     p.pp = text("");
   }
 

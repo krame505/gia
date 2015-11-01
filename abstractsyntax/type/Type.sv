@@ -116,7 +116,7 @@ t::Type ::= n::Name t1::Type
 abstract production resolvedGenericType
 t::Type ::= old::Type args::[Type] resolved::Type
 {
-  t.pp = pp"${old.pp}<${ppImplode(text(", "), map((.pp), args))}>";
+  t.pp = pp"${old.pp}<${ppImplode(text(", "), map(actualPP, args))}>";
   forwards to resolved;
 }
 
@@ -125,6 +125,30 @@ t::Type ::= te::TypeExpr params::[String] tenv::TypeEnv
 {
   te.typeNameEnv = addEnv(zipWith(pair, params, repeat(anyType(), length(params))), tenv);
   forwards to te.type;
+}
+
+abstract production genericVarType
+t::Type ::= n::Name t1::Type
+{
+  t.pp = pp"'${n.pp}";
+  forwards to t1;
+}
+
+abstract production functionTypeWithTE
+t::Type ::= params::[Type] ret::Type typeNameEnv::TypeEnv paramsTE::TypeExprs retTE::TypeExpr
+{
+  forwards to functionType(params, ret);
+}
+
+function actualPP
+Document ::= t::Type
+{
+  return
+    case t of
+      namedType(_, t1) -> t1.pp
+    | genericVarType(_, t1) -> t1.pp
+    | _ -> t.pp
+    end;
 }
 
 function mergeTypesErrors
@@ -241,6 +265,10 @@ Maybe<Type> ::= t1::Type t2::Type
         end
     | structureType(_), _ -> just(anyType()) -- Temporary hack until better checking is implimented for overloaded operators
     | dataType(_, _), _ -> just(anyType())
+    | extendsType(n1, dataType(n2, f1)), extendsType(n3, dataType(n4, f2)) -> 
+        if n1.name == n3.name && n2.name == n4.name
+        then just(extendsType(n1, dataType(n2, f1))) -- Data types with the same name must be identical
+        else nothing()
     | extendsType(n1, dataType(n2, f1)), dataType(n3, f2) -> 
         if n1.name == n3.name || n2.name == n3.name
         then just(dataType(n3, f1)) -- Data types with the same name must be identical

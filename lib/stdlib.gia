@@ -1,9 +1,9 @@
 # gia standard util
 
 # Maybe
-datatype Maybe = {hasValue: bool, value, cond: bool, and: (any) -> any, or: (any) -> any, not: bool};
+datatype Maybe<a> = {hasValue: bool, value : a, cond: bool, and: (any) -> any, or: (any) -> any, not: bool};
 
-Some(x): Maybe {
+Some(x : 'a): Maybe<a> {
   hasValue = true;
   value = x;
   cond = true;
@@ -51,16 +51,16 @@ range(lower : int, upper : int) : int*
 inSet(x, s : any%) s == (s | set {x});
 
 # Map
-datatype MapEntry = {key, value, eq: (any) -> bool}; # TODO: Fix bug with parameter type names missing
-datatype Map = {entries: MapEntry%, index: (any) -> any};
+datatype MapEntry<k, v> = {key : k, value : v, eq: (MapEntry<k, v>) -> bool};
+datatype Map<k, v> = {entries: MapEntry<k, v>%, index: (k) -> v};
 
-MapEntry(k, v): MapEntry {
+MapEntry(k : 'k, v : 'v) : MapEntry<k, v> {
   key = k;
   value = v;
   eq = fn(other) (other == key);
 };
 
-Map(ks, vs): Map {
+Map(ks : 'k*, vs : 'v*) : Map<k, v> {
   entries =
     if ks.null
     then set {}
@@ -68,30 +68,30 @@ Map(ks, vs): Map {
   index = fn(x)(get(x, self));
 };
 
-MapFromSet(s): Map {
+MapFromSet(s : MapEntry<'k, 'v>%) : Map<k, v> {
   entries = s;
   index = fn(x)(get(x, self));
 };
 
-put(k, v, m: Map)
+put(k : 'k, v : 'v, m : Map<k, v>) : Map<k, v>
   MapFromSet(set {(MapEntry(k, v))} | m.entries);
 
-inMap(k, m: Map) : bool
+inMap(k : 'k, m: Map<k, 'v>) : bool
   m.entries[k].value.hasValue;
 
-get(k, m: Map)
+get(k : 'k, m: Map<k, 'v>) : v
   m.entries[k].value.value;
 
 # Pair
-# Note: This is going away eventually when there is a proper tuple extension
-datatype Pair = {fst, snd};
-Pair(fst, snd) : Pair {
+# Note: This might be going away eventually when there is a proper tuple extension
+datatype Pair<a, b> = {fst : a, snd : b};
+Pair(fst : 'a, snd : 'b) : Pair<a, b> {
   fst = fst;
   snd = snd;
 };
 
-fst(p : Pair) p.fst;
-snd(p : Pair) p.snd;
+fst(p : Pair<'a, 'b>) : a p.fst;
+snd(p : Pair<'a, 'b>) : b p.snd;
 
 # String
 toStr(x) x.toStr;

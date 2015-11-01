@@ -158,7 +158,7 @@ e::Expr ::= f::Expr args::Exprs
   body.env =
     case f.value of
       val:functionValue(n, env, tenv, params, _, paramNames, _) -> 
-        addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", lazyValue(e.env, e.typeNameEnv, e))], env)
+        addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", lazyValue(e.env, e.typeNameEnv, e, anyType()))], env)
     end;
   
   local argRuntimeErrors::[Message] =
@@ -517,7 +517,10 @@ e::Expr ::= ds::Decls
         zipWith(
           pair,
           map(fst, ds.rules),
-          map(lazyValue(addEnv(ds.defs, e.env), addEnv(ds.typeNameDefs, e.typeNameEnv), _), map(snd, ds.rules))))
+          zipWith(
+            lazyValue(addEnv(ds.defs, e.env), addEnv(ds.typeNameDefs, e.typeNameEnv), _, _),
+            map(snd, ds.rules),
+            map(snd, ds.ruleTypes))))
     end;
   
   ds.nonRecEnv = e.env;
