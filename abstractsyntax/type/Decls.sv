@@ -144,7 +144,7 @@ d::Decl ::= n::Name mte::MaybeTypeExpr e::Expr
 }
 
 aspect production nodeDecl
-d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
+d::Decl ::= n::Name gp::[Name] p::Params mte::MaybeTypeExpr b::Expr
 {
   d.errors <- 
      case b.type, mte.type of
@@ -154,29 +154,34 @@ d::Decl ::= n::Name p::Params mte::MaybeTypeExpr b::Expr
          | _ -> [err(d.location, s"Incompatible types for expected and actual fields: ${show(80, structureType(f2).pp)}, ${show(80, structureType(f1).pp)}")]
          end
      | _, _ -> convertTypeErrors(mte.type, b.type, "expected and actual return types", d.location)
-     end;
+     end ++
+     if length(names) != length(nubBy(stringEq, names))
+     then [err(d.location, "Duplicate generic parameters")]
+     else [];
   d.typeDefs =
     if mte.isJust
-    then [pair(n.name, functionTypeWithTE(p.types, mte.type, d.typeNameEnv, p.typeExprs, mte.typeExprOrAny))]
-    else [pair(n.name, functionTypeWithTE(p.types, b.type, d.typeNameEnv, p.typeExprs, mte.typeExprOrAny))];
+    then [pair(n.name, functionTypeWithTE(map((.name), gp), p.types, mte.type, d.typeNameEnv, p.typeExprs, mte.typeExprOrAny))]
+    else [pair(n.name, functionTypeWithTE(map((.name), gp), p.types, b.type, d.typeNameEnv, p.typeExprs, mte.typeExprOrAny))];
   d.typeRecDefs =
     if mte.isJust
-    then [pair(n.name, functionType(p.types, mte.type))]
-    else [pair(n.name, functionType(p.types, anyType()))];
+    then [pair(n.name, functionType(map((.name), gp), p.types, mte.type))]
+    else [pair(n.name, functionType(map((.name), gp), p.types, anyType()))];
   d.typeNameDefs = [];
   d.typeNameRecDefs = [];
   
   local genericParams::TypeExprs = p.typeExprs;
+  local defs::[TypeDef] = zipWith(pair, map((.name), gp), repeat(anyType(), length(gp))) ++ genericParams.genericTypeDefs;
+  local names::[String] = map(fst, defs); 
   genericParams.genericTestTypes = repeat(anyType(), p.len);
-  p.typeNameEnv = addEnv(genericParams.genericTypeDefs, d.typeNameEnv);
-  mte.typeNameEnv = addEnv(genericParams.genericTypeDefs, d.typeNameEnv);
+  p.typeNameEnv = addEnv(defs, d.typeNameEnv);
+  mte.typeNameEnv = p.typeNameEnv;
+  b.typeNameEnv = p.typeNameEnv;
   
   -- Dummy values provided for error checking
   b.typeEnv =
     if !mte.isJust
-    then addEnv(p.typeDefs ++ [pair(n.name, functionType(p.types, anyType())), pair("self", mte.type)], d.typeEnv)
+    then addEnv(p.typeDefs ++ [pair(n.name, functionType(map((.name), gp), p.types, anyType())), pair("self", mte.type)], d.typeEnv)
     else addEnv(p.typeDefs ++ d.typeDefs ++ [pair("self", mte.type)], d.typeEnv);
-  b.typeNameEnv = d.typeNameEnv;
   d.ruleTypes = [pair(n.name, anyType())];--e.type
 }
 

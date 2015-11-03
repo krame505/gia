@@ -56,7 +56,7 @@ t::Type ::= t1::Type
 {
   t.pp =
     case t1 of
-      functionType(_, _) -> pp"[${t1.pp}]*"
+      functionType(_, _, _) -> pp"[${t1.pp}]*"
     | _ -> pp"${t1.pp}*"
     end;
 }
@@ -66,7 +66,7 @@ t::Type ::= t1::Type
 {
   t.pp =
     case t1 of
-      functionType(_, _) -> pp"[${t1.pp}]%"
+      functionType(_, _, _) -> pp"[${t1.pp}]%"
     | _ -> pp"${t1.pp}%"
     end;
 }
@@ -94,9 +94,12 @@ Document ::= val::Pair<String Type>
 }
 
 abstract production functionType
-t::Type ::= params::[Type] ret::Type
+t::Type ::= genericParams::[String] params::[Type] ret::Type
 {
-  t.pp = pp"(${ppImplode(text(", "), map((.pp), params))}) -> ${ret.pp}";
+  t.pp =
+    if !null(genericParams)
+    then pp"(${ppImplode(text(", "), map((.pp), params))}) -> ${ret.pp}"
+   	else pp"(<${ppImplode(text(", "), map(text, genericParams))}>, ${ppImplode(text(", "), map((.pp), params))}) -> ${ret.pp}";
 }
 
 -- Non-canonical
@@ -135,9 +138,9 @@ t::Type ::= n::Name t1::Type
 }
 
 abstract production functionTypeWithTE
-t::Type ::= params::[Type] ret::Type typeNameEnv::TypeEnv paramsTE::TypeExprs retTE::TypeExpr
+t::Type ::= genericParams::[String] params::[Type] ret::Type typeNameEnv::TypeEnv paramsTE::TypeExprs retTE::TypeExpr
 {
-  forwards to functionType(params, ret);
+  forwards to functionType(genericParams, params, ret);
 }
 
 function actualPP
@@ -248,10 +251,10 @@ Maybe<Type> ::= t1::Type t2::Type
         just(t) -> just(setType(t))
       | nothing() -> nothing()
       end
-    | functionType(p1, r1), functionType(p2, r2) ->
-        case convertParams(p1, p2), convertType(r1, r2) of
-          just(p), just(r) -> just(functionType(p, r))
-        | _, _ -> nothing()
+    | functionType(gp1, p1, r1), functionType(gp2, p2, r2) ->
+        case foldr(andHelper, true, zipWith(stringEq, gp1, gp2)), convertParams(p1, p2), convertType(r1, r2) of
+          true, just(p), just(r) -> just(functionType(gp1, p, r))
+        | _, _, _ -> nothing()
         end
     | structureType(f1), structureType(f2) -> 
         case convertFields(f1, f2) of

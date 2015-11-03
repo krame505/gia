@@ -45,10 +45,16 @@ concrete productions te::TypeExpr
   }
 | '(' params::TypeExprs ')' '->' ret::TypeExpr
   {
-    te.ast = abs:functionTypeExpr(params.ast, ret.ast, location=te.location);
+    te.ast = abs:functionTypeExpr([], params.ast, ret.ast, location=te.location);
     te.pp = pp"(${params.pp}) -> ${ret.pp}";
   }
+| '(' mgp::MaybeGenericParams ',' params::TypeExprs ')' '->' ret::TypeExpr
+  {
+    te.ast = abs:functionTypeExpr(mgp.ast, params.ast, ret.ast, location=te.location);
+    te.pp = pp"(${mgp.pp}, ${params.pp}) -> ${ret.pp}";
+  }
 | n::Id_t
+  precedence = 1 -- Win over Expr Id_t
   {
     te.ast = abs:nameTypeExpr(abs:name(n.lexeme, location=n.location), location=te.location);
     te.pp = text(n.lexeme);

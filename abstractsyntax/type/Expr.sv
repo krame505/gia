@@ -61,40 +61,46 @@ e::Expr ::= e1::Expr
 }
 
 aspect production app
-e::Expr ::= f::Expr args::Exprs
+e::Expr ::= f::Expr gargs::TypeExprs args::Exprs
 {
   e.errors <- 
     case f.type of
       anyType() -> []
-    | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
+    | functionType(_, params, ret) -> paramErrors(params, args.types, 1, e.location)
     | _ -> [err(e.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
   e.patternErrors <- 
     case f.type of
       anyType() -> []
-    | functionType(params, ret) -> paramErrors(params, args.types, 1, e.location)
+    | functionType(_, params, ret) -> paramErrors(params, args.types, 1, e.location)
     | _ -> [err(e.location, s"Cannot apply non-function of type ${show(80, f.type.pp)}")]
     end;
     
   local genericParams::TypeExprs = 
     case f.type of
-      functionTypeWithTE(_, _, _, params, ret) -> params
+      functionTypeWithTE(_, _, _, _, params, ret) -> params
+    end;
+  genericParams.typeNameEnv = 
+    case f.type of
+      functionTypeWithTE(gp, _, _, tenv, _, _) ->
+        addEnv(zipWith(pair, gp, gargs.types), tenv)
     end;
   genericParams.genericTestTypes = args.types;
     
   local genericRet::TypeExpr = 
     case f.type of
-      functionTypeWithTE(_, _, _, params, ret) -> ret
+      functionTypeWithTE(_, _, _, _, params, ret) -> ret
     end;
   genericRet.typeNameEnv = 
     case f.type of
-      functionTypeWithTE(_, _, tenv, _, _) -> addEnv(genericParams.genericTypeDefs, tenv)
+      functionTypeWithTE(gp, _, _, tenv, _, _) ->
+        addEnv(zipWith(pair, gp, gargs.types) ++ genericParams.genericTypeDefs, tenv)
     end;
     
   e.type =
     case f.type of
-      functionTypeWithTE(_, _, _, params, ret) -> genericRet.type
-    | functionType(params, ret) -> ret
+      functionTypeWithTE(_, _, _, _, params, ret) -> genericRet.type
+    | functionType(_, params, ret) -> ret
     | _ -> anyType()
     end;
 }
@@ -120,7 +126,7 @@ aspect production lambdaExpr
 e::Expr ::= params::Params body::Expr
 {
   body.typeEnv = addEnv(params.typeDefs, e.typeEnv);
-  e.type = functionType(params.types, body.type);
+  e.type = functionType([], params.types, body.type);
 }
 
 -- TODO: Type check overloaded ops properly

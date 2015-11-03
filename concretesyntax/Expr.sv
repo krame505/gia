@@ -29,6 +29,7 @@ concrete productions e::Expr
     e.pp = text(s.lexeme);
   }
 | n::Id_t
+  precedence = 0 -- Lose to TypeExpr Id_t
   {
     e.ast = abs:nameLiteral(abs:name(n.lexeme, location=n.location), location=e.location);
     e.pp = text(n.lexeme);
@@ -40,7 +41,12 @@ concrete productions e::Expr
   }
 | f::Expr LALParen_t args::Exprs ')'
   {
-    e.ast = abs:app(f.ast, args.ast, location=e.location);
+    e.ast = abs:app(f.ast, abs:nilTypeExpr(), args.ast, location=e.location);
+    e.pp = concat([f.pp, text("("), args.pp, text(")")]);
+  }
+| f::Expr '<' tes::TypeExprs '>' LALParen_t args::Exprs ')'
+  {
+    e.ast = abs:app(f.ast, tes.ast, args.ast, location=e.location);
     e.pp = concat([f.pp, text("("), args.pp, text(")")]);
   }
 | 'fn' '(' params::Params ')' '(' body::Expr ')'

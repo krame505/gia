@@ -135,9 +135,9 @@ e::Expr ::= e1::Expr
 }
 
 abstract production app
-e::Expr ::= f::Expr args::Exprs
+e::Expr ::= f::Expr gargs::TypeExprs args::Exprs
 {
-  e.errors := f.errors ++ args.errors;
+  e.errors := f.errors ++ gargs.errors ++ args.errors;
   e.patternErrors :=
     case f of
       nameLiteral(n) -> []
@@ -148,29 +148,35 @@ e::Expr ::= f::Expr args::Exprs
   
   local body::Expr =
     case f.value of
-      val:functionValue(_, _, _, _, _, _, body) -> body
+      val:functionValue(_, _, _, _, _, _, _, body) -> body
     end;
   body.typeEnv = 
     case f.value of
-      val:functionValue(n, env, tenv, params, _, paramNames, _) -> tenv
+      val:functionValue(n, env, tenv, _, params, _, paramNames, _) -> tenv
     end; -- TODO: Find bad dependency
-  body.typeNameEnv = e.typeNameEnv; -- Need for run-time type checking, TODO: Is scoping correct?
+  body.typeNameEnv =  -- Need for run-time type checking, TODO: Is scoping correct?
+    case f.value of
+      val:functionValue(n, env, tenv, gp, params, _, paramNames, _) ->
+        if gargs.len == 0
+        then addEnv(zipWith(pair, map((.name), gp), repeat(anyType(), length(gp))), e.typeNameEnv)
+        else addEnv(zipWith(pair, map((.name), gp), gargs.types), e.typeNameEnv)
+    end;
   body.env =
     case f.value of
-      val:functionValue(n, env, tenv, params, _, paramNames, _) -> 
+      val:functionValue(n, env, tenv, _, params, _, paramNames, _) -> 
         addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", lazyValue(e.env, e.typeNameEnv, e, anyType()))], env)
     end;
   
   local argRuntimeErrors::[Message] =
     valuesErrors(args.values) ++
     case f.value.type of
-      functionType(params, _) -> paramErrors(params, map((.type), args.values), 1, e.location)
+      functionType(_, params, _) -> paramErrors(params, map((.type), args.values), 1, e.location)
     | _ -> [err(f.location, "Cannot apply non-function")]
     end;
   e.value =
     if null(argRuntimeErrors)
     then case f.value of
-      val:functionValue(n, env, tenv, _, ret, _, _) ->
+      val:functionValue(n, env, tenv, _, _, ret, _, _) ->
         case ret, body.value of
           dataType(_, _), structureValue(fields) -> val:nodeValue(n, left(ret), args.values, fields)
         | _, _ -> body.value
@@ -219,7 +225,7 @@ e::Expr ::= params::Params body::Expr
   body.env = addEnv(params.defs, e.env);
   
   local id::String = toString(genInt());
-  e.value = val:functionValue(s"<lambda ${id}>", e.env, e.typeEnv, params.types, body.type, params.names, body);
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, e.typeEnv, [], params.types, body.type, params.names, body);
 }
 
 abstract production addOp

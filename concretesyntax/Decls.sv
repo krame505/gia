@@ -28,6 +28,7 @@ d::Decls ::= 'return' e::Expr ';'
 
 concrete production nilDecl
 d::Decls ::= 
+precedence = 0 -- Lose to TypeExpr Params
 {
   d.ast = abs:nilDecl();
   d.ioOut = d.ioIn;
@@ -102,18 +103,19 @@ d::Decl ::= 'datatype' n::Id_t mgp::MaybeGenericParams me::MaybeExtends '=' te::
 }
 
 concrete production nodeDecl
-d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::Expr ';'
+d::Decl ::= n::Id_t mgp::MaybeGenericParams '(' p::Params ')' mte::MaybeTypeExpr b::Expr ';'
 {
-  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), p.ast, mte.ast, b.ast, location=d.location);
+  d.ast = abs:nodeDecl(abs:name(n.lexeme, location=n.location), mgp.ast, p.ast, mte.ast, b.ast, location=d.location);
   d.ioOut = d.ioIn;
 }
 
 concrete production nodeDeclNoBody
-d::Decl ::= n::Id_t '(' p::Params ')' mte::MaybeTypeExpr b::';'
+d::Decl ::= n::Id_t mgp::MaybeGenericParams '(' p::Params ')' mte::MaybeTypeExpr b::';'
 {
   d.ast =
     abs:nodeDecl(
       abs:name(n.lexeme, location=n.location),
+      mgp.ast,
       p.ast,
       mte.ast,
       abs:declExpr(abs:nilDecl(), location=b.location), location=d.location);
@@ -137,6 +139,7 @@ concrete productions p::Params
     p.pp = cat(text(h.lexeme), mte.pp);
   }
 |
+  precedence = 1 -- Win over nilDecls
   {
     p.ast = abs:nilParam();
     p.fieldAst = abs:nilFields();

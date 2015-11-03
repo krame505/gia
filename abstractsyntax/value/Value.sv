@@ -130,10 +130,10 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::ValueEnv tenv::TypeEnv params::[Type] ret::Type paramNames::[String] body::Expr
+v::Value ::= name::String env::ValueEnv tenv::TypeEnv genericParams::[Name] params::[Type] ret::Type paramNames::[String] body::Expr
 {
   v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params))})";
-  v.type = functionType(params, ret);
+  v.type = functionType(map((.name), genericParams), params, ret);
 }
 
 abstract production nodeValue
@@ -605,6 +605,7 @@ Value ::= op::String bindings::[Pair<String Value>] v::Value loc::Location
   local res::Expr = 
     app(
       valueExpr(lookup, location=bogusLocation),
+      nilTypeExpr(),
       consExpr(valueExpr(v, location=bogusLocation), nilExpr()),
       location=bogusLocation);
   res.env = emptyEnv();
@@ -613,7 +614,7 @@ Value ::= op::String bindings::[Pair<String Value>] v::Value loc::Location
   return
     case v, lookup of
       errorValue(_), _ -> v
-    | _, functionValue(_, _, _, _, _, _, _) -> res.value
+    | _, functionValue(_, _, _, _, _, _, _, _) -> res.value
     | _, _ -> lookup -- TODO: Better error message
     end;
 }
@@ -630,7 +631,7 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(n1, _, l1, _) ->
       if n == n1
       then eqList(l, listValue(l1), loc)
@@ -649,7 +650,7 @@ Value ::= bindings::[Pair<String Value>] v::Value loc::Location
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(_, _, _, fields) ->
       if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
@@ -711,6 +712,7 @@ Value ::= v::Value
            "<builtin lambda and Maybe>",
            emptyEnv(),
            emptyEnv(),
+           [],
            [anyType()],
            anyType(),
            ["m"],
@@ -721,6 +723,7 @@ Value ::= v::Value
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
+           [],
            [anyType()],
            anyType(),
            ["m"],
@@ -746,6 +749,7 @@ Value ::=
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
+           [],
            [anyType()],
            anyType(),
            ["m"],
@@ -756,6 +760,7 @@ Value ::=
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
+           [],
            [anyType()],
            anyType(),
            ["m"],

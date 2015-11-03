@@ -116,3 +116,7 @@ explode(sep : str, s : str) : str* {
   
   return helper(0, 0, "", "");
 };
+
+# Misc
+min(x, y) if x > y then x else y;
+max(x, y) if x < y then x else y;

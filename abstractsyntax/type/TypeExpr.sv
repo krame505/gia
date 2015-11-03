@@ -96,19 +96,19 @@ te::TypeExpr ::= fields::Fields
 }
 
 abstract production functionTypeExpr
-te::TypeExpr ::= params::TypeExprs ret::TypeExpr
+te::TypeExpr ::= genericParams::[Name] params::TypeExprs ret::TypeExpr
 {
   te.errors := ret.errors ++ params.errors;
-  te.type = functionType(params.types, ret.type);
+  te.type = functionType(map((.name), genericParams), params.types, ret.type);
   
   params.genericTestTypes =
     case te.genericTestType of
-      functionType(ps, _) -> ps
+      functionType(_, ps, _) -> ps
     | _ -> repeat(anyType(), params.len)
     end;
   ret.genericTestType =
     case te.genericTestType of
-      functionType(_, ret) -> ret
+      functionType(_, _, ret) -> ret
     | _ -> anyType()
     end;
   te.genericTypeDefs = params.genericTypeDefs ++ ret.genericTypeDefs;
