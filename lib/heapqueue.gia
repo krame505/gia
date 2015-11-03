@@ -1,0 +1,53 @@
+use "pqueue.gia";
+
+HeapQueue<k, v>() : PriorityQueue<k, v> {
+  datatype Node = {key : k, value : v, left : Node, right : Node, rank : int};
+  Leaf() : Node {
+    key = error("Demanded key from leaf");
+    value = error("Demanded value from leaf");
+    left = error("Demanded left from leaf");
+    right = error("Demanded right from leaf");
+    rank = 0;
+  };
+  Node(k, v, l, r) : Node {
+    key = k;
+    value = v;
+    left = l;
+    right = r;
+    rank = max(l.rank, r.rank);
+  };
+  HeapQueueImpl(contents) : PriorityQueue {
+    merge(n1, n2)
+      if n1 ~ Leaf()
+      then n2
+      else if n2 ~ Leaf()
+      then n1
+      else {
+        merged = merge(n1.right, n2);
+        return
+          if n1.key < n2.key
+          then merge(n2, n1)
+          else if n1.left.rank >= merged.rank
+          then Node(n1.key, n1.value, n1.left, merged)
+          else Node(n1.key, n1.value, merged, n1.left);
+      };
+
+    add(key : k, value : v)
+      HeapQueueImpl(merge(Node(key, value, Leaf(), Leaf()), contents));
+    remove_max : PriorityQueue<k, v> = 
+      if contents ~ Leaf()
+      then error("Cannot remove from empty heap")
+      else HeapQueueImpl(merge(contents.left, contents.right));
+    max : v = 
+      if contents ~ Leaf()
+      then error("Cannot get max from empty heap")
+      else contents.value;
+
+    isEmpty = contents == Leaf();
+    cond = !isEmpty;
+
+    increaseKey = error("Not yet implimented");
+    decreaseKey = error("Not yet implimented");
+  };
+  return HeapQueueImpl(Leaf());
+};
