@@ -1,13 +1,14 @@
 use "pqueue.gia";
 
 HeapQueue<k, v>() : PriorityQueue<k, v> {
-  datatype Node = {key : k, value : v, left : Node, right : Node, rank : int};
+  datatype Node = {key : k, value : v, left : Node, right : Node, rank : int, paths : Map<v, Path*>};
   Leaf() : Node {
     key = error("Demanded key from leaf");
     value = error("Demanded value from leaf");
     left = error("Demanded left from leaf");
     right = error("Demanded right from leaf");
     rank = 0;
+    paths = Map([], []);
   };
   Node(k, v, l, r) : Node {
     key = k;
@@ -15,8 +16,20 @@ HeapQueue<k, v>() : PriorityQueue<k, v> {
     left = l;
     right = r;
     rank = max(l.rank, r.rank);
+    paths =
+      Map(l.paths.keys, map(fn(p)(Left() :: p), l.paths.values)) |
+      Map(r.paths.keys, map(fn(p)(Right() :: p), r.paths.values));
   };
-  HeapQueueImpl(contents) : PriorityQueue {
+
+  datatype Path = {};
+  Left() : Path;
+  Right() : Path;
+  follow(path : Path*, tree : Node)
+    if path == Left()
+    then tree.left
+    else tree.right;
+
+  HeapQueueImpl(contents) : PriorityQueue<k, v> {
     merge(n1, n2)
       if n1 ~ Leaf()
       then n2
@@ -34,6 +47,18 @@ HeapQueue<k, v>() : PriorityQueue<k, v> {
 
     add(key : k, value : v)
       HeapQueueImpl(merge(Node(key, value, Leaf(), Leaf()), contents));
+    remove(value : v) {
+      removeHelp(path, tree)
+        if path.null
+        then merge(tree.left, tree.right)
+        else if path.hd == Left()
+        then Node(tree.key, tree.value, removeHelp(path.tl, tree.left), tree.right)
+        else Node(tree.key, tree.value, tree.left, removeHelp(path.tl, tree.right));
+      return
+        if !inMap(value, contents.paths)
+        then error(value.pp + " is not in map and cannot be removed")
+        else HeapQueueImpl(removeHelp(value, contents));
+    };
     remove_max : PriorityQueue<k, v> = 
       if contents ~ Leaf()
       then error("Cannot remove from empty heap")

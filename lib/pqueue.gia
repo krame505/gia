@@ -1,4 +1,5 @@
 datatype PriorityQueue<k, v> = {add : (k, v) -> PriorityQueue,
+                                remove : (v) -> PriorityQueue,
                                 remove_max : PriorityQueue,
                                 max : v,
                                 isEmpty : bool,

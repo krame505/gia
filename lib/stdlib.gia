@@ -51,8 +51,13 @@ range(lower : int, upper : int) : int*
 inSet(x, s : any%) s == (s | set {x});
 
 # Map
-datatype MapEntry<k, v> = {key : k, value : v, eq: (MapEntry<k, v>) -> bool};
-datatype Map<k, v> = {entries: MapEntry<k, v>%, index: (k) -> v};
+datatype MapEntry<k, v> = {key : k, value : v, eq : (MapEntry<k, v>) -> bool};
+datatype Map<k, v> = {entries : MapEntry<k, v>%,
+                      keys : k*,
+                      values : v*,
+                      index : (k) -> v,
+                      and : (Map<k, v>) -> Map<k, v>,
+                      or : (Map<k, v>) -> Map<k, v>};
 
 MapEntry(k : 'k, v : 'v) : MapEntry<k, v> {
   key = k;
@@ -65,19 +70,27 @@ Map(ks : 'k*, vs : 'v*) : Map<k, v> {
     if ks.null
     then set {}
     else put(ks.hd, vs.hd, Map(ks.tl, vs.tl));
+  keys = ks;
+  values = vs;
   index = fn(x)(get(x, self));
+  and = fn(other)(MapFromSet(entries & other.entries));
+  or = fn(other)(MapFromSet(entries | other.entries));
 };
 
 MapFromSet(s : MapEntry<'k, 'v>%) : Map<k, v> {
   entries = s;
+  keys = map(fn(me)(me.key), entries.toList);
+  values = map(fn(me)(me.value), entries.toList);
   index = fn(x)(get(x, self));
+  and = fn(other)(MapFromSet(entries & other.entries));
+  or = fn(other)(MapFromSet(entries | other.entries));
 };
 
 put(k : 'k, v : 'v, m : Map<k, v>) : Map<k, v>
   MapFromSet(set {(MapEntry(k, v))} | m.entries);
 
 inMap(k : 'k, m: Map<k, 'v>) : bool
-  m.entries[k].value.hasValue;
+  m.entries[k].hasValue;
 
 get(k : 'k, m: Map<k, 'v>) : v
   m.entries[k].value.value;

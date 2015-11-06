@@ -129,12 +129,21 @@ e::Expr ::= params::Params body::Expr
   e.type = functionType([], params.types, body.type);
 }
 
--- TODO: Type check overloaded ops properly
 aspect production addOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  --e.errors <- mergeTypesErrors(e1.type, e2.type, "+", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.addType of
+      just(_) -> []
+    | nothing() -> typeError(e1.type, e2.type, "+", e.location)
+    end;
+  e.type = 
+    case t1.addType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 aspect production subOp
@@ -219,7 +228,7 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production accessOp
 e::Expr ::= e1::Expr n::Name
 {
-  e.errors <- if containsBy(stringEq, n.name, ["toStr", "pp", "len", "null", "hd", "tl", "internal_debug_hackUnparse"]) then [] else --TODO
+  e.errors <- if containsBy(stringEq, n.name, ["toStr", "pp", "len", "null", "hd", "tl", "toList", "internal_debug_hackUnparse", "internal_debug_dynamicType"]) then [] else --TODO
     case e1.type of
       dataType(_, fields) ->
         case lookupList(n.name, fields) of

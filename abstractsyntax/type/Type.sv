@@ -97,7 +97,7 @@ abstract production functionType
 t::Type ::= genericParams::[String] params::[Type] ret::Type
 {
   t.pp =
-    if !null(genericParams)
+    if null(genericParams)
     then pp"(${ppImplode(text(", "), map((.pp), params))}) -> ${ret.pp}"
    	else pp"(<${ppImplode(text(", "), map(text, genericParams))}>, ${ppImplode(text(", "), map((.pp), params))}) -> ${ret.pp}";
 }
@@ -160,8 +160,14 @@ function mergeTypesErrors
   return
     case mergeTypes(t1, t2) of
       just(t) -> []
-    | nothing() -> [err(loc, s"Incompatible types for ${op}: ${show(80, t1.pp)}, ${show(80, t2.pp)}")]
+    | nothing() -> typeError(t1, t2, op, loc)
     end;
+}
+
+function typeError
+[Message] ::= t1::Type t2::Type op::String loc::Location
+{
+  return [err(loc, s"Incompatible types for ${op}: ${show(80, t1.pp)}, ${show(80, t2.pp)}")];
 }
 
 function mergeTypesOrAny

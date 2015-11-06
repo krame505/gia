@@ -130,10 +130,12 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::ValueEnv tenv::TypeEnv genericParams::[Name] params::[Type] ret::Type paramNames::[String] body::Expr
+v::Value ::= name::String env::ValueEnv tenv::TypeEnv tnenv::TypeEnv genericParams::[Name] params::TypeExprs ret::TypeExpr paramNames::[String] body::Expr
 {
-  v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params))})";
-  v.type = functionType(map((.name), genericParams), params, ret);
+  params.typeNameEnv = tnenv;
+  ret.typeNameEnv = tnenv;
+  v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params.types))})";
+  v.type = functionTypeWithTE(map((.name), genericParams), params.types, ret.type, tnenv, params, ret);
 }
 
 abstract production nodeValue
@@ -483,6 +485,7 @@ Value ::= l::[Value] field::Name loc::Location
   return
     case field.name of
       "len" -> intValue(length(l))
+    | "toList" -> listValue(l)
     | _ -> accessDefault(setValue(l), field, loc)
     end;
 }
@@ -556,6 +559,7 @@ Value ::= v::Value field::Name loc::Location
       "toStr" -> strValue(show(80, v.toStr))
     | "pp" -> strValue(show(80, v.pp))
     | "internal_debug_hackUnparse" -> strValue(hackUnparse(v))
+    | "internal_debug_dynamicType" -> strValue(show(80, v.type.pp))
     | _ -> nameOpError(".", v, field, loc)
     end;
 }
@@ -614,7 +618,7 @@ Value ::= op::String bindings::[Pair<String Value>] v::Value loc::Location
   return
     case v, lookup of
       errorValue(_), _ -> v
-    | _, functionValue(_, _, _, _, _, _, _, _) -> res.value
+    | _, functionValue(_, _, _, _, _, _, _, _, _) -> res.value
     | _, _ -> lookup -- TODO: Better error message
     end;
 }
@@ -631,7 +635,7 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(n1, _, l1, _) ->
       if n == n1
       then eqList(l, listValue(l1), loc)
@@ -650,7 +654,7 @@ Value ::= bindings::[Pair<String Value>] v::Value loc::Location
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(_, _, _, fields) ->
       if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
@@ -712,9 +716,10 @@ Value ::= v::Value
            "<builtin lambda and Maybe>",
            emptyEnv(),
            emptyEnv(),
+           emptyEnv(),
            [],
-           [anyType()],
-           anyType(),
+           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
+           anyTypeExpr(location=bogusLocation),
            ["m"],
            nameLiteral(name("m", location=bogusLocation), location=bogusLocation))),
        pair(
@@ -723,9 +728,10 @@ Value ::= v::Value
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
+           emptyEnv(),
            [],
-           [anyType()],
-           anyType(),
+           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
+           anyTypeExpr(location=bogusLocation),
            ["m"],
            valueExpr(result, location=bogusLocation))),
        pair("not", falseValue())]);
@@ -749,9 +755,10 @@ Value ::=
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
+           emptyEnv(),
            [],
-           [anyType()],
-           anyType(),
+           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
+           anyTypeExpr(location=bogusLocation),
            ["m"],
            falseLiteral(location=bogusLocation))),
        pair(
@@ -760,9 +767,10 @@ Value ::=
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
+           emptyEnv(),
            [],
-           [anyType()],
-           anyType(),
+           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
+           anyTypeExpr(location=bogusLocation),
            ["m"],
            nameLiteral(name("m", location=bogusLocation), location=bogusLocation))),
        pair("not", trueValue())]);

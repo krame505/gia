@@ -2,8 +2,8 @@ Near-term TODO items
 ====================
 * Type-check overloaded operators
 * Fix hacks with resolving recursive typing
-* Fix bugs with run-time errors not being 'bubbled up' to the top level
 * Re-think recursive values - should decls be fully recursive?  
+* Better errors for incompatible fields
 * Set syntax is annoying
 * Finish incomplete pp - low priority
 

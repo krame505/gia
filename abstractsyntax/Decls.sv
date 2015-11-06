@@ -134,7 +134,7 @@ abstract production nodeDecl
 d::Decl ::= n::Name gp::[Name] p::Params mte::MaybeTypeExpr b::Expr
 {
   d.errors := p.errors ++ mte.errors ++ b.errors;
-  d.defs = [pair(n.name, val:functionValue(n.name, d.env, d.typeEnv, gp, p.types, mte.type, p.names, b))];
+  d.defs = [pair(n.name, val:functionValue(n.name, d.env, d.typeEnv, d.typeNameEnv, gp, p.typeExprs, mte.typeExprOrAny, p.names, b))];
   d.rules = [pair(n.name, lambdaExpr(p, b, location=d.location))];
   
   -- Dummy values provided for error checking
