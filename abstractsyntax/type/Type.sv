@@ -167,7 +167,19 @@ function mergeTypesErrors
 function typeError
 [Message] ::= t1::Type t2::Type op::String loc::Location
 {
-  return [err(loc, s"Incompatible types for ${op}: ${show(80, t1.pp)}, ${show(80, t2.pp)}")];
+  return [err(loc, s"${op} undefined for ${show(80, t1.pp)} and ${show(80, t2.pp)}")];
+}
+
+function unaryTypeError
+[Message] ::= t1::Type op::String loc::Location
+{
+  return [err(loc, s"${op} undefined for ${show(80, t1.pp)}")];
+}
+
+function accessTypeError
+[Message] ::= t1::Type n::String loc::Location
+{
+  return [err(loc, s"${show(80, t1.pp)} does not have field ${n}")];
 }
 
 function mergeTypesOrAny

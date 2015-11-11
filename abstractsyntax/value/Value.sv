@@ -130,12 +130,10 @@ v::Value ::= contents::[Value]
 }
 
 abstract production functionValue
-v::Value ::= name::String env::ValueEnv tenv::TypeEnv tnenv::TypeEnv genericParams::[Name] params::TypeExprs ret::TypeExpr paramNames::[String] body::Expr
+v::Value ::= name::String env::ValueEnv tenv::TypeEnv genericParams::[Name] params::[Type] ret::Type paramNames::[String] body::Expr
 {
-  params.typeNameEnv = tnenv;
-  ret.typeNameEnv = tnenv;
-  v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params.types))})";
-  v.type = functionTypeWithTE(map((.name), genericParams), params.types, ret.type, tnenv, params, ret);
+  v.pp = pp"function ${text(name)}(${ppImplode(text(", "), map((.pp), params))})";
+  v.type = functionType(map((.name), genericParams), params, ret);
 }
 
 abstract production nodeValue
@@ -155,6 +153,7 @@ v::Value ::= name::String type::Either<Type Name> children::[Value] bindings::[P
     | right(n) -> dataType(n, zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))))
     end;
   v.access = accessNode(name, type, children, bindings, _, _);
+  v.index = nodeOp("index", bindings, _, _);
   v.eq = eqNode(name, children, bindings, _, _);
   v.add = nodeOp("add", bindings, _, _);
   v.sub = nodeOp("sub", bindings, _, _);
@@ -180,6 +179,7 @@ v::Value ::= bindings::[Pair<String Value>]
     else pp"{${ppImplode(text("; "), map((bindingToStr), bindings))};}";
   v.type = structureType(zipWith(pair, map(fst, bindings), map((.type), map(snd, bindings))));
   v.access = access(bindings, _, _);
+  v.index = nodeOp("index", bindings, _, _);
   v.eq = eqStructure(bindings, _, _);
   v.add = nodeOp("add", bindings, _, _);
   v.sub = nodeOp("sub", bindings, _, _);
@@ -618,7 +618,7 @@ Value ::= op::String bindings::[Pair<String Value>] v::Value loc::Location
   return
     case v, lookup of
       errorValue(_), _ -> v
-    | _, functionValue(_, _, _, _, _, _, _, _, _) -> res.value
+    | _, functionValue(_, _, _, _, _, _, _, _) -> res.value
     | _, _ -> lookup -- TODO: Better error message
     end;
 }
@@ -635,7 +635,7 @@ Value ::= n::String l::[Value] bindings::[Pair<String Value>] v::Value loc::Loca
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(n1, _, l1, _) ->
       if n == n1
       then eqList(l, listValue(l1), loc)
@@ -654,7 +654,7 @@ Value ::= bindings::[Pair<String Value>] v::Value loc::Location
   local lookup::Value = access(bindings, name("eq", location=bogusLocation), loc);
   return
     case lookup, v of
-      functionValue(_, _, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
+      functionValue(_, _, _, _, _, _, _, _), _ -> nodeOp("eq", bindings, v, loc)
     | _, nodeValue(_, _, _, fields) ->
       if foldr(andHelper, true, zipWith(stringEq, map(fst, bindings), map(fst, fields)))
       then eqList(map(snd, bindings), listValue(map(snd, fields)), loc)
@@ -716,10 +716,9 @@ Value ::= v::Value
            "<builtin lambda and Maybe>",
            emptyEnv(),
            emptyEnv(),
-           emptyEnv(),
            [],
-           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
-           anyTypeExpr(location=bogusLocation),
+           [anyType()],
+           anyType(),
            ["m"],
            nameLiteral(name("m", location=bogusLocation), location=bogusLocation))),
        pair(
@@ -728,10 +727,9 @@ Value ::= v::Value
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
-           emptyEnv(),
            [],
-           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
-           anyTypeExpr(location=bogusLocation),
+           [anyType()],
+           anyType(),
            ["m"],
            valueExpr(result, location=bogusLocation))),
        pair("not", falseValue())]);
@@ -755,10 +753,9 @@ Value ::=
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
-           emptyEnv(),
            [],
-           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
-           anyTypeExpr(location=bogusLocation),
+           [anyType()],
+           anyType(),
            ["m"],
            falseLiteral(location=bogusLocation))),
        pair(
@@ -767,10 +764,9 @@ Value ::=
            "<builtin lambda>",
            emptyEnv(),
            emptyEnv(),
-           emptyEnv(),
            [],
-           consTypeExpr(anyTypeExpr(location=bogusLocation), nilTypeExpr()),
-           anyTypeExpr(location=bogusLocation),
+           [anyType()],
+           anyType(),
            ["m"],
            nameLiteral(name("m", location=bogusLocation), location=bogusLocation))),
        pair("not", trueValue())]);

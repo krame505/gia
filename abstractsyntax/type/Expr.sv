@@ -139,7 +139,7 @@ e::Expr ::= e1::Expr e2::Expr
       just(_) -> []
     | nothing() -> typeError(e1.type, e2.type, "+", e.location)
     end;
-  e.type = 
+  e.type =
     case t1.addType of
       just(t) -> t
     | nothing() -> anyType()
@@ -149,69 +149,167 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production subOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  --e.errors <- mergeTypesErrors(e1.type, e2.type, "-", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.subType of
+      just(_) -> []
+    | nothing() -> typeError(e1.type, e2.type, "-", e.location)
+    end;
+  e.type = 
+    case t1.subType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 aspect production mulOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  --e.errors <- mergeTypesErrors(e1.type, e2.type, "*", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.mulType of
+      just(_) -> []
+    | nothing() -> typeError(e1.type, e2.type, "*", e.location)
+    end;
+  e.type = 
+    case t1.mulType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 aspect production divOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  --e.errors <- mergeTypesErrors(e1.type, e2.type, "/", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.divType of
+      just(_) -> []
+    | nothing() -> typeError(e1.type, e2.type, "/", e.location)
+    end;
+  e.type = 
+    case t1.divType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
--- TODO: Type check overload is boolean
 aspect production eqOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  --e.errors <- mergeTypesErrors(e1.type, e2.type, "==", e.location);
-  e.type = boolType();
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.eqType of
+      just(boolType()) -> []
+    | just(anyType()) -> []
+    | just(_) -> [err(e1.location, "Type for overloaded operator == must be bool")]
+    | nothing() -> typeError(e1.type, e2.type, "==", e.location)
+    end;
+  e.type = 
+    case t1.eqType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
--- TODO: Type check overload is boolean
 aspect production gtOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.type = boolType();
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.gtType of
+      just(boolType()) -> []
+    | just(anyType()) -> []
+    | just(_) -> [err(e1.location, "Type for overloaded operator > must be bool")]
+    | nothing() -> typeError(e1.type, e2.type, ">", e.location)
+    end;
+  e.type = 
+    case t1.gtType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 -- TODO: Type check overload is boolean
 aspect production gteOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.type = boolType();
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.gtType, t1.eqType of
+      just(t1), just(t2) ->
+        case mergeTypes(t1, t2) of
+          just(boolType()) -> []
+        | just(anyType()) -> []
+        | just(_) -> [err(e1.location, "Type for overloaded operator >= must be bool")]
+        | nothing() -> typeError(e1.type, e2.type, ">=", e.location)
+        end
+    | _, nothing() -> typeError(e1.type, e2.type, ">=", e.location)
+    | nothing(), _ -> typeError(e1.type, e2.type, ">=", e.location)
+    end;
+  e.type = 
+    case t1.gtType, t1.eqType of
+      just(t1), just(t2) -> mergeTypesOrAny(t1, t2)
+    | just(t1), nothing() -> t1
+    | nothing(), just(t2) -> t2
+    | nothing(), nothing() -> anyType()
+    end;
 }
 
 aspect production andOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  --e.errors <- mergeTypesErrors(e1.type, e2.type, "&", e.location);
-    --convertTypeExpectedErrors(e1.type, boolType(), "&", e.location) ++
-    --convertTypeExpectedErrors(e2.type, boolType(), "&", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);--boolType();
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.andType of
+      just(_) -> []
+    | nothing() -> typeError(e1.type, e2.type, "&", e.location)
+    end;
+  e.type = 
+    case t1.andType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 aspect production orOp
 e::Expr ::= e1::Expr e2::Expr
 {
-  e.errors <- mergeTypesErrors(e1.type, e2.type, "|", e.location);
-    --convertTypeExpectedErrors(e1.type, boolType(), "|", e.location) ++
-    --convertTypeExpectedErrors(e2.type, boolType(), "|", e.location);
-  e.type = mergeTypesOrAny(e1.type, e2.type);--boolType();
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.orType of
+      just(_) -> []
+    | nothing() -> typeError(e1.type, e2.type, "|", e.location)
+    end;
+  e.type = 
+    case t1.orType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 aspect production notOp
 e::Expr ::= e1::Expr
 {
-  --e.errors <- convertTypeExpectedErrors(e1.type, boolType(), "!", e.location);
-  e.type = e1.type;--boolType();
+  local t1::Type = e1.type;
+  e.errors <-
+    case t1.notType of
+      just(_) -> []
+    | nothing() -> unaryTypeError(e1.type, "!", e.location)
+    end;
+  e.type = 
+    case t1.notType of
+      just(t) -> t
+    | nothing() -> anyType()
+    end;
 }
 
 aspect production matchOp
@@ -228,34 +326,17 @@ e::Expr ::= e1::Expr e2::Expr
 aspect production accessOp
 e::Expr ::= e1::Expr n::Name
 {
-  e.errors <- if containsBy(stringEq, n.name, ["toStr", "pp", "len", "null", "hd", "tl", "toList", "internal_debug_hackUnparse", "internal_debug_dynamicType"]) then [] else --TODO
-    case e1.type of
-      dataType(_, fields) ->
-        case lookupList(n.name, fields) of
-          just(_) -> []
-        | nothing() -> [err(e1.location, s"Value of type ${show(80, e1.type.pp)} does not have field ${n.name}")]
-        end
-    | structureType(fields) ->
-        case lookupList(n.name, fields) of
-          just(_) -> []
-        | nothing() -> [err(e1.location, s"Value of type ${show(80, e1.type.pp)} does not have field ${n.name}")]
-        end
-    | anyType() -> []
-    | _ -> []--[err(e1.location, s"Value of type ${show(80, e1.type.pp)} does not have fields")]
+  local t1::Type = e1.type;
+  t1.otherName = n.name;
+  e.errors <-
+    case t1.accessType of
+      just(_) -> []
+    | nothing() -> accessTypeError(e1.type, n.name, e.location)
     end;
-  e.type =
-    case e1.type of
-      dataType(_, fields) ->
-        case lookupList(n.name, fields) of
-          just(v) -> v
-        | nothing() -> anyType()
-        end
-    | structureType(fields) ->
-        case lookupList(n.name, fields) of
-          just(v) -> v
-        | nothing() -> anyType()
-        end
-    | _ -> anyType()
+  e.type = 
+    case t1.accessType of
+      just(t) -> t
+    | nothing() -> anyType()
     end;
 }
 
@@ -272,7 +353,7 @@ e::Expr ::= h::Expr t::Expr
     end;
   e.type =
     case h.type, t.type of
-      t1, listType(t2) -> listType(mergeTypesOrAny(t1, t2))
+      t1, listType(t2) -> listType(mergeTypesOrDynamic(t1, t2))
     | t1, _ -> listType(t1)
     end;
 }
@@ -280,21 +361,17 @@ e::Expr ::= h::Expr t::Expr
 aspect production index
 e::Expr ::= e1::Expr e2::Expr
 {
-  {-e.errors <-
-    case convertType(e2.type, intType()) of
+  local t1::Type = e1.type;
+  t1.otherType = e2.type;
+  e.errors <-
+    case t1.indexType of
       just(_) -> []
-    | nothing() -> [err(e1.location, s"Index in list access must be an int (got ${show(80, e2.type.pp)})")]
-    end ++
-    case e1.type of
-      anyType() -> []
-    | listType(_) -> []
-    | _ ->[err(e1.location, s"Expression in list access must be an list (got ${show(80, e1.type.pp)})")]
-    end;-}
-  e.type =
-    case e2.type of
-      listType(t) -> t
-    | setType(t) -> t
-    | _ -> anyType()
+    | nothing() -> typeError(e1.type, e2.type, "[]", e.location)
+    end;
+  e.type = 
+    case t1.indexType of
+      just(t) -> t
+    | nothing() -> anyType()
     end;
 }
 

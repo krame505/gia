@@ -10,7 +10,7 @@ function driver
 IOVal<Integer> ::= args::[String] ioIn::IO parse::(ParseResult<cnc:Root>::=String String) exprParse::(ParseResult<cnc:Expr>::=String String)
 {
   local result::ParseResult<cnc:Root> = parse(head(args), head(tail(args)));
-  local exprResult::ParseResult<cnc:Expr> = exprParse(implode(" ", tail(tail(args))), "");
+  local exprResult::ParseResult<cnc:Expr> = exprParse(implode(" ", tail(tail(args))), "<stdin>");
   local cst::cnc:Root = result.parseTree;
   cst.cnc:ioIn = ioIn;
   cst.cnc:currentDir = "."; --TODO?
@@ -28,7 +28,7 @@ IOVal<Integer> ::= args::[String] ioIn::IO parse::(ParseResult<cnc:Root>::=Strin
     then ioval(print(exprResult.parseErrors ++ "\n", cst.cnc:ioOut), 4)
     else if !null(ast.errors)
     then ioval(print(messagesToString(ast.errors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.errors, false) then 3 else 0)
-    else if !null(ast.errors)
+    else if !null(ast.abs:evalErrors)
     then ioval(print(messagesToString(ast.abs:evalErrors) ++ "\n", cst.cnc:ioOut), if containsErrors(ast.abs:evalErrors, false) then 2 else 0)
     else case ast.abs:evalRes of
       abs:errorValue(_) -> ioval(print("Runtime errors:\n" ++ show(80, ast.abs:evalRes.abs:pp) ++ "\n", cst.cnc:ioOut), 1)

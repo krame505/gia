@@ -138,21 +138,26 @@ abstract production genericAppTypeExpr
 te::TypeExpr ::= te1::TypeExpr args::TypeExprs
 {
   te.errors := 
-    case te1.type of
-      genericType(te, params, tenv) -> 
-        if args.len == length(params)
-        then []
-        else [err(te.location, s"Wrong number of generic arguments (expected ${toString(length(params))}, got ${toString(args.len)})")]
-      | _ -> [err(te.location, "Type expression does not have generic parameters")]
-    end ++ args.errors;
+  	(if null(te1.errors)
+     then
+       case te1.type of
+         genericType(te, params, tenv) -> 
+           if args.len == length(params)
+           then []
+           else [err(te.location, s"Wrong number of generic arguments (expected ${toString(length(params))}, got ${toString(args.len)})")]
+         | _ -> [err(te.location, "Type expression does not have generic parameters")]
+       end
+     else te1.errors) ++ args.errors;
   
   local base::TypeExpr = 
     case te1.type of
       genericType(te, params, tenv) -> te
+    | _ -> anyTypeExpr(location=bogusLocation)
     end;
   base.typeNameEnv = 
     case te1.type of
       genericType(te, params, tenv) -> addEnv(zipWith(pair, params, args.types), tenv)
+    | _ -> emptyEnv()
     end;
   
   te.type = resolvedGenericType(te1.type, args.types, base.type);

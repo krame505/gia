@@ -1,6 +1,5 @@
 Near-term TODO items
 ====================
-* Type-check overloaded operators
 * Fix hacks with resolving recursive typing
 * Re-think recursive values - should decls be fully recursive?  
 * Better errors for incompatible fields

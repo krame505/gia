@@ -148,22 +148,22 @@ e::Expr ::= f::Expr gargs::TypeExprs args::Exprs
   
   local body::Expr =
     case f.value of
-      val:functionValue(_, _, _, _, _, _, _, _, body) -> body
+      val:functionValue(_, _, _, _, _, _, _, body) -> body
     end;
   body.typeEnv = 
     case f.value of
-      val:functionValue(n, env, tenv, tnenv, _, params, _, paramNames, _) -> tenv
+      val:functionValue(n, env, tenv, _, params, _, paramNames, _) -> tenv
     end; -- TODO: Find bad dependency
   body.typeNameEnv =  -- Need for run-time type checking, TODO: Is scoping correct?
     case f.value of
-      val:functionValue(n, env, tenv, tnenv, gp, params, _, paramNames, _) ->
+      val:functionValue(n, env, tenv, gp, params, _, paramNames, _) ->
         if gargs.len == 0
         then addEnv(zipWith(pair, map((.name), gp), repeat(anyType(), length(gp))), e.typeNameEnv)
         else addEnv(zipWith(pair, map((.name), gp), gargs.types), e.typeNameEnv)
     end;
   body.env =
     case f.value of
-      val:functionValue(n, env, tenv, tnenv, _, params, _, paramNames, _) -> 
+      val:functionValue(n, env, tenv, _, params, _, paramNames, _) -> 
         addEnv(zipWith(pair, paramNames, args.values) ++ [pair(n, f.value)] ++ [pair("self", lazyValue(e.env, e.typeNameEnv, e, anyType()))], env)
     end;
   
@@ -173,41 +173,14 @@ e::Expr ::= f::Expr gargs::TypeExprs args::Exprs
       functionType(_, params, _) -> paramErrors(params, map((.type), args.values), 1, e.location)
     | _ -> [err(f.location, "Cannot apply non-function")]
     end;
-    
-  local genericParamsRuntime::TypeExprs = 
-    case f.value.type of
-      functionTypeWithTE(_, _, _, _, params, ret) -> params
-    end;
-  genericParamsRuntime.typeNameEnv = 
-    case f.value.type of
-      functionTypeWithTE(gp, _, _, tenv, _, _) ->
-        addEnv(zipWith(pair, gp, gargs.types), tenv)
-    end;
-  genericParamsRuntime.genericTestTypes = map((.type), args.values);
-    
-  local genericRetRuntime::TypeExpr = 
-    case f.value.type of
-      functionTypeWithTE(_, _, _, _, params, ret) -> ret
-    end;
-  genericRetRuntime.typeNameEnv = 
-    case f.value.type of
-      functionTypeWithTE(gp, _, _, tenv, _, _) ->
-        addEnv(zipWith(pair, gp, gargs.types) ++ genericParamsRuntime.genericTypeDefs, tenv)
-    end;
-  
   e.value =
     if null(argRuntimeErrors)
-    then case f.value, f.value.type of
-      val:functionValue(n, env, tenv, tnenv, _, _, _, _, _), functionTypeWithTE(_, _, ret, _, _, _) ->
-        case ret, body.value of
-          dataType(_, _), structureValue(fields) -> val:nodeValue(n, left(genericRetRuntime.type), args.values, fields)
-        | _, _ -> body.value
-        end
-{-    | val:functionValue(n, env, tenv, tnenv, _, _, _, _, _), functionType(_, _, ret) ->
+    then case f.value of
+      val:functionValue(n, env, tenv, _, _, ret, _, _) ->
         case ret, body.value of
           dataType(_, _), structureValue(fields) -> val:nodeValue(n, left(ret), args.values, fields)
         | _, _ -> body.value
-        end-}
+        end
     end
     else val:errorValue(argRuntimeErrors);
   
@@ -252,15 +225,7 @@ e::Expr ::= params::Params body::Expr
   body.env = addEnv(params.defs, e.env);
   
   local id::String = toString(genInt());
-  e.value =
-    val:functionValue(
-      s"<lambda ${id}>",
-      e.env,
-      e.typeEnv,
-      e.typeNameEnv,
-      [],
-      params.typeExprs,
-      directTypeExpr(body.type, location=bogusLocation), params.names, body);
+  e.value = val:functionValue(s"<lambda ${id}>", e.env, e.typeEnv, [], params.types, body.type, params.names, body);
 }
 
 abstract production addOp
